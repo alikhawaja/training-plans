@@ -324,19 +324,39 @@ arrived." Revisit the diagrams if those distinctions are unclear.
 
 ## Environment preparation
 
-Read the [prerequisites and safety boundaries](README.md). Run every command from
-the **repository root**, using synthetic data only. Keep the existing Kafka
-workshop environment if already installed; these commands add REST dependencies.
+### Choose your tools and obtain the files
 
-PowerShell:
+Read the [prerequisites, installation links, and safety boundaries](README.md).
+Windows learners use PowerShell (built-in 5.1 or 7+); macOS learners use Terminal
+with zsh/bash; Linux learners use bash. **Do not install PowerShell on macOS/Linux
+for this course.** Shell command blocks are labelled: run only your platform's
+block, not both. `python` blocks run inside Python, not directly in your shell.
+
+If the repository is not already on your computer, use Git in either shell:
+
+```text
+git clone https://github.com/alikhawaja/training-plans.git
+cd training-plans
+```
+
+Alternatively, download the repository ZIP from GitHub's **Code** menu, extract
+it, and open a terminal in the extracted folder containing `rest-apis` and `kafka`.
+Do not clone again if your instructor already provided a checkout.
+
+Run subsequent shell commands from this **repository root**, using synthetic
+data only. Keep the existing Kafka workshop environment if already installed;
+these commands add REST dependencies, and REST does not require Kafka.
+
+### Prepare host Python (both server paths)
+
+**Windows - PowerShell:**
 
 ```powershell
 python --version
-docker version
-docker compose version
+curl.exe --version
 ```
 
-If `.venv` does not already exist:
+Confirm Python 3.11-3.13. If `.venv` does not already exist:
 
 ```powershell
 python -m venv .venv
@@ -348,42 +368,121 @@ Then:
 .\.venv\Scripts\python.exe -m pip install -r rest-apis\examples\requirements.txt
 $Python = ".\.venv\Scripts\python.exe"
 $Compose = "rest-apis\infrastructure\compose.yml"
-$Base = "http://127.0.0.1:8000"
-$Headers = @{ Authorization = "Bearer workshop-demo-token" }
+& $Python -c "import sys, httpx, fastapi, uvicorn; print(sys.version); print('REST dependencies ready')"
 ```
 
 Set these variables in every new terminal where you need them. Using the Python
 executable directly avoids virtual-environment activation or execution-policy changes.
 
-macOS/Linux:
+**macOS/Linux - bash or zsh:**
 
 ```bash
-# Create this environment only if it does not already exist.
+python3 --version
+curl --version
+```
+
+Confirm Python 3.11-3.13. If `.venv` does not already exist:
+
+```bash
 python3 -m venv .venv
+```
+
+Then:
+
+```bash
 .venv/bin/python -m pip install -r rest-apis/examples/requirements.txt
 Python=".venv/bin/python"
 Compose="rest-apis/infrastructure/compose.yml"
-Base="http://127.0.0.1:8000"
+"$Python" -c "import sys, httpx, fastapi, uvicorn; print(sys.version); print('REST dependencies ready')"
 ```
 
-For the Python and Docker commands below, change `& $Python` to `"$Python"`, quote
-`"$Compose"` as appropriate, and use `/` in local paths. PowerShell's
-`Invoke-WebRequest` and `Invoke-RestMethod` examples are host-specific: use the
-Python client or Swagger UI on other hosts. Module 4 also includes portable curl
-examples. On Windows, use `curl.exe` explicitly to avoid older PowerShell aliases.
+Set `Python` and `Compose` again in every new shell terminal. Check the printed
+venv Python version too: an existing `.venv` may use a different interpreter.
+If Python, pip, venv, or curl is missing, complete the README installation steps
+before continuing. Do not use `sudo pip`, disable TLS checks, or change PowerShell
+execution policy to work around setup failures.
+
+### Choose one server path
+
+**Native Python:** Docker is not required. Use the native command in module 2,
+keep that server terminal open, and run clients in a second terminal.
+
+**Docker:** Install and start Docker using the platform instructions in the
+README. Docker Desktop on Windows/macOS includes Compose; on Linux, Engine
+needs the Compose plugin. In either shell, check:
+
+```text
+docker info
+docker compose version
+```
+
+**Expected:** The daemon is reachable, it runs Linux containers, and Compose is
+v2.20 or newer. A working `docker --version` alone does not prove the daemon
+is running. Native-mode learners skip all Docker commands throughout the guide.
 
 ## 2. Start the server and inspect the contract (30 minutes)
 
 **Objective:** Distinguish a running server, a health response, and API documentation.
 
+### Option A: Docker server
+
+**Windows - PowerShell:**
+
 ```powershell
 docker compose -f $Compose config --quiet
 docker compose -f $Compose up -d --build --wait --wait-timeout 120
 docker compose -f $Compose ps
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+docker compose -f "$Compose" config --quiet
+docker compose -f "$Compose" up -d --build --wait --wait-timeout 120
+docker compose -f "$Compose" ps
+```
+
+**Expected:** A healthy container. If image download or package installation
+fails, use [build troubleshooting](troubleshooting.md#container-build-or-installation-fails);
+do not disable TLS verification.
+
+### Option B: Native Python server (without Docker)
+
+In a dedicated terminal at the repository root, set `Python` as in environment
+preparation, then run only your platform's command:
+
+**Windows - PowerShell:**
+
+```powershell
+& $Python -m uvicorn api:app --app-dir rest-apis\examples --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" -m uvicorn api:app --app-dir rest-apis/examples --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+**Expected:** Uvicorn listens on `http://127.0.0.1:8000`. Keep this terminal open;
+use a second terminal at the repository root for the clients and set `Python`
+there too. This mode uses `.state/rest-api.db` instead of the Docker volume.
+Do not run both listeners on port 8000. Stop the foreground server with Ctrl+C.
+
+### Readiness checkpoint (both paths)
+
+**Windows - PowerShell:**
+
+```powershell
 & $Python rest-apis\examples\client.py health
 ```
 
-**Expected:** A healthy container and `HTTP 200` with `{"status": "ok"}`.
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" rest-apis/examples/client.py health
+```
+
+**Expected:** `HTTP 200` with `{"status": "ok"}`.
 The health endpoint checks that the orders table can be read; it is not proof
 that every feature or business workflow works.
 
@@ -403,18 +502,10 @@ word `Bearer`, and authorize. The UI supplies the header. Expand
 Find the create request schema and its required fields. The full response has
 pagination metadata even when `items` is empty.
 
-If image download or package installation fails, use
-[build troubleshooting](troubleshooting.md#container-build-or-installation-fails);
-do not disable TLS verification.
-
-**Without Docker:** In a dedicated terminal at the repository root, run:
-
-```powershell
-& $Python -m uvicorn api:app --app-dir rest-apis\examples --host 127.0.0.1 --port 8000 --no-access-log
-```
-
-This uses `.state/rest-api.db` on the host instead of the Docker volume. Do not run
-both listeners on port 8000. Stop the foreground server with Ctrl+C.
+Before proceeding, confirm that host dependency imports succeeded, the chosen
+server is listening, the health client returns 200, and `/docs` loads and can
+execute the authorized list request. If one fails, use
+[troubleshooting](troubleshooting.md) instead of continuing with a partial setup.
 
 **Check:** Why is the `/docs` page a client even though the same server hosts it?
 
@@ -422,9 +513,18 @@ both listeners on port 8000. Stop the foreground server with Ctrl+C.
 
 **Objective:** Observe a resource being created and then read it by its returned address.
 
+**Windows - PowerShell:**
+
 ```powershell
 & $Python rest-apis\examples\client.py create --reference first-order --item "Training notebook" --quantity 2
 & $Python rest-apis\examples\client.py list
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" rest-apis/examples/client.py create --reference first-order --item "Training notebook" --quantity 2
+"$Python" rest-apis/examples/client.py list
 ```
 
 **Expected:** Create returns `201`, a JSON order, `Location`, `ETag`, and
@@ -438,9 +538,18 @@ to read it. Its stable `reference` is a synthetic business identifier.
 
 Copy the returned UUID:
 
+**Windows - PowerShell:**
+
 ```powershell
 $OrderId = "REPLACE_WITH_THE_RETURNED_UUID"
 & $Python rest-apis\examples\client.py get $OrderId
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+OrderId="REPLACE_WITH_THE_RETURNED_UUID"
+"$Python" rest-apis/examples/client.py get "$OrderId"
 ```
 
 The placeholder is not executable data; replace it before running. IDs and ETags
@@ -459,41 +568,72 @@ server's ID-generation rule?
 
 Read `rest-apis/examples/client.py`. Locate the base URL, Authorization header,
 timeouts, JSON serialization, bounded retry loop, and nonzero error exit code.
-The full CLI is a reusable client; this minimal inline example shows the essentials:
+The full CLI is a reusable client; this minimal example shows the essentials.
+For shared Python exercises in this guide, **start the Python interpreter**
+from your shell using your platform's command:
+
+**Windows - PowerShell:**
 
 ```powershell
-@'
-import httpx
-
-with httpx.Client(base_url="http://127.0.0.1:8000", timeout=5.0) as client:
-    response = client.get(
-        "/api/v1/orders",
-        headers={"Authorization": "Bearer workshop-demo-token"},
-    )
-    print(response.status_code, response.headers.get("content-type"))
-    response.raise_for_status()
-    print(response.json())
-'@ | & $Python -
+& $Python
 ```
 
-On macOS/Linux, put the Python lines in an interpreter or use your shell's heredoc
-syntax. `response.json()` decodes JSON; it does not prove the HTTP request succeeded.
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python"
+```
+
+When you see Python's `>>>` prompt, paste the following Python block. Do not
+type the prompt itself. These Python instructions are the same on every OS;
+they are not PowerShell commands. `exit()` returns you to your shell.
+
+```python
+import httpx
+
+client = httpx.Client(base_url="http://127.0.0.1:8000", timeout=5.0)
+response = client.get("/api/v1/orders", headers={"Authorization": "Bearer workshop-demo-token"})
+print(response.status_code, response.headers.get("content-type"))
+response.raise_for_status()
+print(response.json())
+client.close()
+exit()
+```
+
+`response.json()` decodes JSON; it does not prove the HTTP request succeeded.
 `raise_for_status()` is one way to make non-success responses explicit.
 
-Use a second client tool:
+Use a second client tool from your shell:
+
+**Windows - PowerShell:**
 
 ```powershell
 curl.exe -i -H "Authorization: Bearer workshop-demo-token" "http://127.0.0.1:8000/api/v1/orders?limit=2"
 ```
 
-On macOS/Linux use `curl` rather than `curl.exe`. `-i` includes response headers.
+**macOS/Linux - bash or zsh:**
+
+```bash
+curl -i -H "Authorization: Bearer workshop-demo-token" "http://127.0.0.1:8000/api/v1/orders?limit=2"
+```
+
+On Windows, `curl.exe` avoids the `curl` alias in Windows PowerShell 5.1.
+`-i` includes response headers.
 Unlike our Python CLI, curl does not treat HTTP error statuses as command failures
 by default; `--fail-with-body` can do that where the installed version supports it.
 
 Now deliberately use incorrect credentials:
 
+**Windows - PowerShell:**
+
 ```powershell
 & $Python rest-apis\examples\client.py --token wrong-token list
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" rest-apis/examples/client.py --token wrong-token list
 ```
 
 **Expected:** `401`, a structured error, and a nonzero process exit code. This is
@@ -521,34 +661,58 @@ PATCH accepts a nonempty object containing selected editable fields, not JSON
 Patch operations or JSON Merge Patch. It uses `application/json`, and explicit
 null is rejected.
 
-First retrieve the current ETag and keep its quote characters:
+Use Python/HTTPX so quoted ETags do not pass through shell-specific argument
+parsing. Start Python from your shell:
+
+**Windows - PowerShell:**
 
 ```powershell
-$Read = Invoke-WebRequest -Uri "$Base/api/v1/orders/$OrderId" -Headers $Headers
-$EditHeaders = @{
-    Authorization = "Bearer workshop-demo-token"
-    "If-Match" = [string]$Read.Headers["ETag"]
-}
-$Patch = Invoke-WebRequest -Uri "$Base/api/v1/orders/$OrderId" -Method Patch -Headers $EditHeaders -ContentType "application/json" -Body '{"quantity":3}'
-$Patch.Content
+& $Python
 ```
 
-Then replace all editable fields using the newly returned ETag:
+**macOS/Linux - bash or zsh:**
 
-```powershell
-$EditHeaders["If-Match"] = [string]$Patch.Headers["ETag"]
-$Replaced = Invoke-WebRequest -Uri "$Base/api/v1/orders/$OrderId" -Method Put -Headers $EditHeaders -ContentType "application/json" -Body '{"item":"Training notebook","quantity":4,"status":"confirmed"}'
-$Replaced.Content
+```bash
+"$Python"
+```
+
+At `>>>`, use the following shared Python code. Replace the UUID placeholder
+with the ID from module 3 before pasting. Python variables are separate from
+shell variables such as `$OrderId`. First retrieve the current ETag and keep
+its quote characters:
+
+```python
+import httpx
+
+order_id = "REPLACE_WITH_THE_RETURNED_UUID"
+path = f"/api/v1/orders/{order_id}"
+client = httpx.Client(base_url="http://127.0.0.1:8000", headers={"Authorization": "Bearer workshop-demo-token"}, timeout=5.0)
+read = client.get(path)
+read.raise_for_status()
+print(read.headers["etag"])
+patch = client.patch(path, headers={"If-Match": read.headers["etag"]}, json={"quantity": 3})
+print(patch.status_code, patch.text)
+patch.raise_for_status()
+```
+
+Stay in the same interpreter. Then replace all editable fields using the newly
+returned ETag:
+
+```python
+replacement = {"item": "Training notebook", "quantity": 4, "status": "confirmed"}
+replaced = client.put(path, headers={"If-Match": patch.headers["etag"]}, json=replacement)
+print(replaced.status_code, replaced.text)
+replaced.raise_for_status()
+client.close()
+exit()
 ```
 
 **Expected:** Both responses are `200`; PATCH preserves unspecified fields.
 PUT requires the complete editable representation. Each actual change advances
 the version. The next module intentionally tests incomplete/invalid bodies.
 
-Module 9 explains why we used `If-Match`. On macOS/Linux use Swagger UI to supply
-the ETag header or copy it into the Python client's `--etag` argument. Quoting
-header values through shells can differ, so the PowerShell header dictionary is
-the primary Windows example.
+Module 9 explains why we used `If-Match`. Swagger UI is an alternative HTTP
+client on every OS: supply the ETag, including quotes, in its `if-match` field.
 
 **Verify:** Read the order and explain which fields each update changed.
 Do not delete this order yet; module 9 uses it for the concurrent-edit exercise.
@@ -582,9 +746,18 @@ real authorization-denied 403.
 
 Deliberately fail quantity validation:
 
+**Windows - PowerShell:**
+
 ```powershell
 & $Python rest-apis\examples\client.py create --quantity 0
 & $Python rest-apis\examples\client.py list --limit 51
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" rest-apis/examples/client.py create --quantity 0
+"$Python" rest-apis/examples/client.py list --limit 51
 ```
 
 In Swagger UI, try a create body with an unknown field, a string quantity instead
@@ -636,10 +809,20 @@ our API does **not** implement per-user or per-order permissions.
 
 Compare these calls:
 
+**Windows - PowerShell:**
+
 ```powershell
 curl.exe -i "http://127.0.0.1:8000/api/v1/orders"
 curl.exe -i -H "Authorization: Bearer wrong" "http://127.0.0.1:8000/api/v1/orders"
 curl.exe -i -H "Authorization: Bearer workshop-demo-token" "http://127.0.0.1:8000/api/v1/orders"
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+curl -i "http://127.0.0.1:8000/api/v1/orders"
+curl -i -H "Authorization: Bearer wrong" "http://127.0.0.1:8000/api/v1/orders"
+curl -i -H "Authorization: Bearer workshop-demo-token" "http://127.0.0.1:8000/api/v1/orders"
 ```
 
 **Expected:** 401, 401, and 200. Bearer means possession of the token grants the
@@ -665,6 +848,8 @@ service check access to the requested order, not merely accept any valid login?
 
 Create several orders with automatically generated references:
 
+**Windows - PowerShell:**
+
 ```powershell
 & $Python rest-apis\examples\client.py create --item "Blue notebook"
 & $Python rest-apis\examples\client.py create --item "Green notebook"
@@ -672,6 +857,17 @@ Create several orders with automatically generated references:
 & $Python rest-apis\examples\client.py list --limit 2
 & $Python rest-apis\examples\client.py list --limit 2 --offset 2
 & $Python rest-apis\examples\client.py list --status confirmed --limit 2
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" rest-apis/examples/client.py create --item "Blue notebook"
+"$Python" rest-apis/examples/client.py create --item "Green notebook"
+"$Python" rest-apis/examples/client.py create --item "Black notebook"
+"$Python" rest-apis/examples/client.py list --limit 2
+"$Python" rest-apis/examples/client.py list --limit 2 --offset 2
+"$Python" rest-apis/examples/client.py list --status confirmed --limit 2
 ```
 
 Collections return exactly these top-level fields:
@@ -690,14 +886,39 @@ Collections return exactly these top-level fields:
 null when no next page is available. Actual results depend on your earlier labs.
 An empty collection is `200` with an empty array, not a missing-resource 404.
 
-Read and follow the first next-page link:
+Read and follow the next-page links using the same Python on every OS.
+Start the interpreter from your shell:
+
+**Windows - PowerShell:**
 
 ```powershell
-$Page = Invoke-RestMethod -Uri "$Base/api/v1/orders?limit=2" -Headers $Headers
-$Page
-if ($Page.next) {
-    Invoke-RestMethod -Uri "$Base$($Page.next)" -Headers $Headers
-}
+& $Python
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python"
+```
+
+At `>>>`, paste this Python block, preserving the blank line after the indented
+loop body. The blank line ends the loop definition in the interactive interpreter.
+The first request includes a filter; subsequent requests follow `next` unchanged.
+
+```python
+import httpx
+
+client = httpx.Client(base_url="http://127.0.0.1:8000", headers={"Authorization": "Bearer workshop-demo-token"}, timeout=5.0)
+next_path = "/api/v1/orders?limit=2&status=pending"
+while next_path is not None:
+    response = client.get(next_path)
+    response.raise_for_status()
+    page = response.json()
+    print(page)
+    next_path = page["next"]
+
+client.close()
+exit()
 ```
 
 The server applies a stable ordering by creation time and ID and caps a page at
@@ -721,18 +942,40 @@ An **ETag** is an opaque representation validator returned in a response header.
 Clients should copy it, including its quotes, not manufacture it from JSON.
 Our ETag changes when editable order data changes.
 
-Read the order and ask whether it changed:
+Start a fresh Python interpreter, then read the order and ask whether it changed:
+
+**Windows - PowerShell:**
 
 ```powershell
-$Read = Invoke-WebRequest -Uri "$Base/api/v1/orders/$OrderId" -Headers $Headers
-$Tag = [string]$Read.Headers["ETag"]
-& $Python rest-apis\examples\client.py get $OrderId --if-none-match $Tag
+& $Python
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python"
+```
+
+At `>>>`, paste this shared Python code after replacing the UUID placeholder
+with your module 3 order ID. Stay in this interpreter through the delete exercise.
+
+```python
+import httpx
+
+order_id = "REPLACE_WITH_THE_RETURNED_UUID"
+path = f"/api/v1/orders/{order_id}"
+client = httpx.Client(base_url="http://127.0.0.1:8000", headers={"Authorization": "Bearer workshop-demo-token"}, timeout=5.0)
+read = client.get(path)
+read.raise_for_status()
+tag = read.headers["etag"]
+conditional = client.get(path, headers={"If-None-Match": tag})
+print(conditional.status_code, conditional.content)
 ```
 
 **Expected:** `304` with no body. A client with a cached representation can reuse
-that body. The demonstration CLI displays the response but does **not** implement
-a persistent cache. If shell quoting alters the ETag, enter it in Swagger UI's
-`if-none-match` field instead.
+that body. Neither this snippet nor the demonstration CLI implements a persistent
+cache. The ETag stays inside Python, avoiding PowerShell/bash/zsh quoting
+differences. You can also enter it in Swagger UI's `if-none-match` field.
 
 Single-order reads return `Cache-Control: private, max-age=0, must-revalidate`:
 private clients may retain data but must revalidate before reuse. Other responses
@@ -756,21 +999,25 @@ sequenceDiagram
     S-->>B: 412 Precondition Failed
 ```
 
-Use the same saved version twice:
+Use the same saved version twice in the same Python interpreter. Choose a first
+quantity different from the current value so the first edit really advances
+the version:
 
-```powershell
-$Stale = Invoke-WebRequest -Uri "$Base/api/v1/orders/$OrderId" -Headers $Headers
-$StaleHeaders = @{
-    Authorization = "Bearer workshop-demo-token"
-    "If-Match" = [string]$Stale.Headers["ETag"]
-}
-Invoke-RestMethod -Uri "$Base/api/v1/orders/$OrderId" -Method Patch -Headers $StaleHeaders -ContentType "application/json" -Body '{"quantity":7}'
-Invoke-RestMethod -Uri "$Base/api/v1/orders/$OrderId" -Method Patch -Headers $StaleHeaders -ContentType "application/json" -Body '{"quantity":8}'
+```python
+stale = client.get(path)
+stale.raise_for_status()
+stale_headers = {"If-Match": stale.headers["etag"]}
+new_quantity = 1 if stale.json()["quantity"] != 1 else 2
+first = client.patch(path, headers=stale_headers, json={"quantity": new_quantity})
+print(first.status_code, first.text)
+first.raise_for_status()
+second = client.patch(path, headers=stale_headers, json={"quantity": 3})
+print(second.status_code, second.text)
 ```
 
-**Expected:** The first succeeds and the second returns 412; PowerShell reports
-an HTTP error for that intentional failure. If the quantity was already seven,
-the first update was a no-op and did not advance the ETag: choose different values.
+**Expected:** The first returns 200 and the second returns 412. HTTPX returns a
+response object for an HTTP error; we deliberately print the second failure
+rather than call `raise_for_status()` because it is the exercise's expected result.
 Re-read and reconcile rather than blindly overwriting another caller's change.
 Omitting `If-Match` yields 428. `If-Match: *` checks existence but does not detect
 which version changed; do not use it to bypass the lost-update exercise.
@@ -780,14 +1027,18 @@ Comparing a version then updating later without an atomic guard would have a rac
 
 **Delete only the selected workshop order:**
 
-```powershell
-$Current = Invoke-WebRequest -Uri "$Base/api/v1/orders/$OrderId" -Headers $Headers
-$DeleteHeaders = @{
-    Authorization = "Bearer workshop-demo-token"
-    "If-Match" = [string]$Current.Headers["ETag"]
-}
-$Deleted = Invoke-WebRequest -Uri "$Base/api/v1/orders/$OrderId" -Method Delete -Headers $DeleteHeaders
-$Deleted.StatusCode
+Still in the same Python interpreter:
+
+```python
+current = client.get(path)
+current.raise_for_status()
+deleted = client.delete(path, headers={"If-Match": current.headers["etag"]})
+print(deleted.status_code, deleted.content)
+deleted.raise_for_status()
+missing = client.get(path)
+print(missing.status_code, missing.text)
+client.close()
+exit()
 ```
 
 **Verify:** Deletion returns 204 with no body; a subsequent GET returns 404.
@@ -810,7 +1061,9 @@ These HTTPX timeouts bound individual phases/inactivity, not an absolute end-to-
 workflow deadline. A production client also needs an overall retry/time budget,
 appropriate jitter, cancellation, and dependency-specific policy.
 
-Stop only this workshop API, then attempt a read:
+Stop only this workshop API, then attempt a read. For the **Docker server path**:
+
+**Windows - PowerShell:**
 
 ```powershell
 docker compose -f $Compose stop api
@@ -818,20 +1071,60 @@ docker compose -f $Compose stop api
 docker compose -f $Compose up -d --wait --wait-timeout 120
 ```
 
+**macOS/Linux - bash or zsh:**
+
+```bash
+docker compose -f "$Compose" stop api
+"$Python" rest-apis/examples/client.py list
+docker compose -f "$Compose" up -d --wait --wait-timeout 120
+```
+
+For the **native server path**, press Ctrl+C in the server terminal, run only the
+client list command below in your client terminal, then restart the server using
+your platform's native command from module 2:
+
+**Windows - PowerShell:**
+
+```powershell
+& $Python rest-apis\examples\client.py list
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" rest-apis/examples/client.py list
+```
+
 **Expected:** The client logs bounded retry attempts and exits nonzero rather
-than printing an empty success-shaped collection. Host-mode learners stop/restart
-their foreground Uvicorn process instead.
+than printing an empty success-shaped collection. After restarting, run that same
+list command again; it should return 200 and your earlier orders.
 
 The tests simulate 503/429 responses and lost write responses deterministically:
+
+**Windows - PowerShell:**
 
 ```powershell
 & $Python -m unittest discover -s rest-apis\examples -p test_api.py -v
 ```
 
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" -m unittest discover -s rest-apis/examples -p test_api.py -v
+```
+
 With the service running, a separate check exercises the actual network API:
+
+**Windows - PowerShell:**
 
 ```powershell
 & $Python rest-apis\examples\smoke_test.py
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" rest-apis/examples/smoke_test.py
 ```
 
 It creates uniquely referenced orders and removes only those test resources.
@@ -883,10 +1176,22 @@ does not turn a single SQLite file into a distributed database.
 
 Make a request, note `X-Request-ID`, then inspect logs:
 
+**Windows - PowerShell (Docker server):**
+
 ```powershell
 & $Python rest-apis\examples\client.py list
 docker compose -f $Compose logs --tail 30 api
 ```
+
+**macOS/Linux - bash or zsh (Docker server):**
+
+```bash
+"$Python" rest-apis/examples/client.py list
+docker compose -f "$Compose" logs --tail 30 api
+```
+
+**Native server, either OS:** Run your platform's client list command above,
+skip the Docker command, and inspect the request log in your server terminal.
 
 The application logs its generated request ID, method, path, and status. Errors
 also include the request ID in their body. The container command disables
@@ -966,17 +1271,36 @@ The base lab does not require this extension to pass.
 
 ## Cleanup
 
-Stop the container while **keeping** its orders:
+**Native server:** Press Ctrl+C in the server terminal. Host-mode
+`.state/rest-api.db` is retained; no Docker cleanup is needed.
+
+**Docker server:** Stop the container while **keeping** its orders:
+
+**Windows - PowerShell:**
 
 ```powershell
 docker compose -f $Compose down
 ```
 
+**macOS/Linux - bash or zsh:**
+
+```bash
+docker compose -f "$Compose" down
+```
+
 **Optional destructive reset:** This removes only this Compose project's volume,
 including all orders stored there:
 
+**Windows - PowerShell:**
+
 ```powershell
 docker compose -f $Compose down --volumes
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+docker compose -f "$Compose" down --volumes
 ```
 
 Host-mode `.state/rest-api.db` is separate and is not removed by Compose. Choose a
