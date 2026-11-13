@@ -7,6 +7,7 @@ and enterprise tradeoffs.
 | Training | Audience | Duration | Start here |
 | --- | --- | --- | --- |
 | Apache Kafka | Developers familiar with a programming language and a terminal; no enterprise-system background required | Three days for beginners; compressed two-day option | [Kafka workshop](kafka/README.md) |
+| REST APIs | Developers with basic Python and terminal familiarity; no web or enterprise-system background required | Three days for beginners; compressed two-day option | [REST API workshop](rest-apis/README.md) |
 
 The examples are learning environments, not production deployment templates.
 Use synthetic data only. Review each workshop's prerequisites and cleanup warnings.

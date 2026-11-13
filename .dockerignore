@@ -1,0 +1,6 @@
+.git
+.venv
+.state
+**/__pycache__
+.env
+kafka
