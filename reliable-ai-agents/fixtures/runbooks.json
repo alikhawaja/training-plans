@@ -1,0 +1,17 @@
+[
+  {
+    "id": "RB-FULFILLMENT",
+    "title": "Payment captured but shipment absent",
+    "text": "Compare payment and shipment evidence for the same order. A captured payment with no shipment is not proof of a carrier outage. Check fulfillment health and logs. Preserve the order ID and event IDs. Escalate when the cause is uncertain. Do not retry a charge, issue a refund, or claim shipment without evidence."
+  },
+  {
+    "id": "RB-OUTAGE",
+    "title": "Fulfillment dependency unavailable",
+    "text": "An HTTP 503 means the dependency is currently unavailable. Retry diagnostics only within the configured budget. Repeating an unchanged observation is not progress. Record a blocked outcome and ask the operator to restore the dependency. Recheck health after recovery; recovery alone does not prove a specific order shipped."
+  },
+  {
+    "id": "RB-TICKET",
+    "title": "Evidence-backed internal ticket notes",
+    "text": "Read the ticket and identify its order reference. Draft an internal note with known facts, evidence references, uncertainty and next steps. An operator must approve the exact note before posting. Check the returned article and ticket afterward. A timeout after posting is ambiguous: reconcile before retrying."
+  }
+]

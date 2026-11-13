@@ -1,0 +1,4 @@
+-r requirements.txt
+agent-framework-core==1.26.0
+agent-framework-openai==1.18.2
+agent-framework-anthropic==1.0.0b261112

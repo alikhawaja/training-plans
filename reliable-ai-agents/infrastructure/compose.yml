@@ -1,0 +1,162 @@
+name: reliable-agents-lab
+
+x-zammad: &zammad
+  image: ghcr.io/zammad/zammad:7.2.3-0000
+  init: true
+  environment: &zammad-env
+    POSTGRESQL_HOST: zammad-db
+    POSTGRESQL_DB: zammad
+    POSTGRESQL_USER: zammad
+    POSTGRESQL_PASS: ${POSTGRES_PASSWORD:?Run manage.py configure}
+    REDIS_URL: redis://zammad-redis:6379
+    MEMCACHE_SERVERS: zammad-cache:11211
+    ELASTICSEARCH_HOST: zammad-search
+    ELASTICSEARCH_PORT: "9200"
+    ELASTICSEARCH_SCHEMA: http
+    ELASTICSEARCH_ENABLED: "true"
+    ZAMMAD_FQDN: localhost:8081
+    ZAMMAD_HTTP_TYPE: http
+    TZ: UTC
+  volumes:
+    - zammad-storage:/opt/zammad/storage
+  depends_on:
+    zammad-db:
+      condition: service_healthy
+    zammad-redis:
+      condition: service_healthy
+    zammad-cache:
+      condition: service_started
+
+services:
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-CU22-ubuntu-22.04
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Run manage.py configure}
+      MSSQL_MEMORY_LIMIT_MB: "2048"
+    ports:
+      - "127.0.0.1:14330:1433"
+    volumes:
+      - sql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  zammad-db:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: zammad
+      POSTGRES_USER: zammad
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run manage.py configure}
+    volumes:
+      - zammad-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zammad -d zammad"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  zammad-redis:
+    image: redis:8.10.3-alpine
+    volumes:
+      - zammad-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  zammad-cache:
+    image: memcached:1.6.45-alpine
+    command: ["memcached", "-m", "128"]
+
+  zammad-search:
+    image: elasticsearch:9.5.5
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - zammad-search:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow' > /dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+
+  zammad-init:
+    <<: *zammad
+    command: ["zammad-init"]
+    user: "0:0"
+    depends_on:
+      zammad-db:
+        condition: service_healthy
+      zammad-redis:
+        condition: service_healthy
+      zammad-search:
+        condition: service_healthy
+
+  zammad-railsserver:
+    <<: *zammad
+    command: ["zammad-railsserver"]
+    depends_on:
+      zammad-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 60s
+
+  zammad-websocket:
+    <<: *zammad
+    command: ["zammad-websocket"]
+    depends_on:
+      zammad-init:
+        condition: service_completed_successfully
+
+  zammad-scheduler:
+    <<: *zammad
+    command: ["zammad-scheduler"]
+    depends_on:
+      zammad-init:
+        condition: service_completed_successfully
+
+  zammad-nginx:
+    <<: *zammad
+    command: ["zammad-nginx"]
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      zammad-railsserver:
+        condition: service_healthy
+      zammad-websocket:
+        condition: service_started
+
+  qdrant:
+    image: qdrant/qdrant:v1.16.0
+    profiles: ["retrieval"]
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  mailpit:
+    image: axllent/mailpit:v1.27.4
+    profiles: ["email"]
+    ports:
+      - "127.0.0.1:8025:8025"
+      - "127.0.0.1:1025:1025"
+
+volumes:
+  sql-data:
+  zammad-db:
+  zammad-redis:
+  zammad-search:
+  zammad-storage:
+  qdrant-data:

@@ -1,0 +1,5 @@
+-r requirements.txt
+deepagents==0.7.34
+langchain-openai==1.7.4
+langchain-anthropic==1.7.10
+langgraph-checkpoint-sqlite==3.1.3

@@ -1,0 +1,8 @@
+fastapi==0.162.0
+uvicorn==0.54.0
+httpx==0.28.1
+pymssql==2.4.6
+python-dotenv==1.2.1
+# Compatible transitive baseline for the two optional framework stacks.
+uuid-utils==0.19.0
+tenacity==9.1.4
