@@ -1,7 +1,10 @@
 # Enterprise extensions
 
-The [main guide](../training-guide.md) is the prerequisite. Commands run from the
-repository root using its `$Single` and `$Python` variables.
+The [main guide](../training-guide.md) and
+[environment setup](../environment-setup.md) are prerequisites. Commands use Bash
+on WSL, macOS, and Linux, from the repository root with the guide's variables.
+Initialize those variables in every new terminal. Native Windows PowerShell
+alternatives are included.
 Only extension A is a runnable integration lab in this release. B-D are explicitly
 design exercises for deeper follow-on workshops, not claims of deployed features.
 
@@ -24,6 +27,18 @@ flowchart LR
 
 ### Prepare
 
+```bash
+docker compose -f "$Single" up -d --wait --wait-timeout 180
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic connect-lines --partitions 1 --replication-factor 1
+docker compose -f "$Single" cp kafka/infrastructure/connect/worker.properties kafka:/tmp/training-worker.properties
+docker compose -f "$Single" cp kafka/infrastructure/connect/file-source.properties kafka:/tmp/training-source.properties
+docker compose -f "$Single" cp kafka/infrastructure/connect/file-sink.properties kafka:/tmp/training-sink.properties
+docker compose -f "$Single" exec -T kafka sh -c 'touch /tmp/kafka-training-input.txt'
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single up -d --wait --wait-timeout 180
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic connect-lines --partitions 1 --replication-factor 1
@@ -33,25 +48,46 @@ docker compose -f $Single cp kafka\infrastructure\connect\file-sink.properties k
 docker compose -f $Single exec -T kafka sh -c 'touch /tmp/kafka-training-input.txt'
 ```
 
-On macOS/Linux, use `/` in the three local configuration paths. Files in `/tmp`
-are intentionally ephemeral and are not stored in the Kafka data volume.
+</details>
+
+Files in `/tmp` are inside the Linux container, intentionally ephemeral, and not
+stored in the Kafka data volume.
 If `connect-lines` already exists, inspect it instead of creating it again.
 
 ### Start the worker
 
 In a dedicated terminal, run in the foreground:
 
+```bash
+docker compose -f "$Single" exec kafka /opt/kafka/bin/connect-standalone.sh /tmp/training-worker.properties /tmp/training-source.properties /tmp/training-sink.properties
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single exec kafka /opt/kafka/bin/connect-standalone.sh /tmp/training-worker.properties /tmp/training-source.properties /tmp/training-sink.properties
 ```
 
+</details>
+
 This command intentionally keeps an interactive terminal attached so Ctrl+C can
 interrupt the worker. Keep it running. In another terminal, wait until the worker responds:
+
+```bash
+docker compose -f "$Single" exec -T kafka bash -c 'exec 3<>/dev/tcp/127.0.0.1/8083; printf "GET /connectors/training-file-source/status HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3; cat <&3'
+docker compose -f "$Single" exec -T kafka bash -c 'exec 3<>/dev/tcp/127.0.0.1/8083; printf "GET /connectors/training-file-sink/status HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3; cat <&3'
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker compose -f $Single exec -T kafka bash -c 'exec 3<>/dev/tcp/127.0.0.1/8083; printf "GET /connectors/training-file-source/status HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3; cat <&3'
 docker compose -f $Single exec -T kafka bash -c 'exec 3<>/dev/tcp/127.0.0.1/8083; printf "GET /connectors/training-file-sink/status HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3; cat <&3'
 ```
+
+</details>
 
 These commands use the image's Bash TCP support because the pinned image does
 not include `curl`; they print the raw HTTP response.
@@ -66,6 +102,16 @@ solely to keep the workshop small.
 
 ### Move data and inspect it
 
+```bash
+docker compose -f "$Single" exec -T kafka sh -c 'printf "order-a\norder-b\n" >> /tmp/kafka-training-input.txt'
+sleep 5
+docker compose -f "$Single" exec -T kafka cat /tmp/kafka-training-output.txt
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic connect-lines --from-beginning --max-messages 2 --timeout-ms 15000
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single exec -T kafka sh -c 'printf "order-a\norder-b\n" >> /tmp/kafka-training-input.txt'
 Start-Sleep -Seconds 5
@@ -73,13 +119,26 @@ docker compose -f $Single exec -T kafka cat /tmp/kafka-training-output.txt
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic connect-lines --from-beginning --max-messages 2 --timeout-ms 15000
 ```
 
+</details>
+
 **Verify:** Both lines appear in the topic and sink file. Append a third line:
+
+```bash
+docker compose -f "$Single" exec -T kafka sh -c 'printf "order-c\n" >> /tmp/kafka-training-input.txt'
+sleep 5
+docker compose -f "$Single" exec -T kafka cat /tmp/kafka-training-output.txt
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker compose -f $Single exec -T kafka sh -c 'printf "order-c\n" >> /tmp/kafka-training-input.txt'
 Start-Sleep -Seconds 5
 docker compose -f $Single exec -T kafka cat /tmp/kafka-training-output.txt
 ```
+
+</details>
 
 If output is not present after five seconds, inspect connector/task status and
 worker logs; the sleep is a convenience, not a delivery guarantee.

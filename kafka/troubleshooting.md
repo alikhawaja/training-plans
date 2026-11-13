@@ -3,14 +3,84 @@
 Commands assume the variables and working directory from the
 [training guide](training-guide.md#prerequisites-and-command-conventions).
 Preserve logs before changing configuration. Do not delete volumes as a first response.
+Use Bash on WSL, macOS, and Linux; expandable alternatives are for native Windows
+PowerShell. Start with the [pre-start readiness check](environment-setup.md#readiness-gate-then-start-the-lab).
+
+## WSL integration or Docker permissions fail
+
+On Windows, confirm `wsl --list --verbose` reports version 2 for the distribution.
+In Docker Desktop, select the WSL 2 engine, Linux containers, and integration
+with that distribution. Open a new Ubuntu terminal after changing integration.
+Do not install a second Docker daemon inside WSL to work around missing integration.
+On native Ubuntu, check daemon status and approved user access; Docker-group
+changes require a new login. Do not use a world-writable socket.
+
+In the workshop terminal:
+
+```bash
+docker context show
+docker context inspect
+docker info
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
+```powershell
+docker context show
+docker context inspect
+docker info
+```
+
+</details>
+
+The daemon must be local and report Linux containers. Remove unintended
+`DOCKER_HOST`/`DOCKER_CONTEXT` overrides using your shell's environment settings,
+or select the correct local context after inspection. Do not change unrelated
+Docker projects or contexts blindly. WSL integration, Windows port reservations,
+VPN/firewall rules, and endpoint protection can affect loopback connectivity.
+Use the smoke test **inside the same Ubuntu terminal** as the labs; native Windows
+success does not prove WSL connectivity. Follow approved WSL/Docker networking
+guidance rather than opening Kafka listeners to the LAN.
+
+## Downloads fail behind a proxy or certificate boundary
+
+Git, uv, managed Python, and Docker image pulls use different download paths and
+may need separate approved proxy/CA configuration. Inspect the reported URL and
+TLS error. For uv, use its
+[certificate configuration](https://docs.astral.sh/uv/concepts/authentication/certificates/)
+and your organization's trust store (current uv supports `--system-certs`).
+A TLS handshake failure is not necessarily a missing CA; consult the proxy/network
+administrator if using the system trust store does not help.
+uv does not read pip's configuration files. If your organization requires a package
+mirror, configure that approved [index in uv](https://docs.astral.sh/uv/concepts/indexes/)
+as well; an existing pip setup alone does not configure uv.
+
+For restricted networks, an instructor can distribute approved, hash-verified
+wheels matching the pinned version, Python, OS, and CPU, and a preloaded Kafka
+image. uv can install approved local wheels without contacting an index.
+Do not use `--allow-insecure-host`, disable certificate verification, or switch
+to an untrusted mirror. Preflight does not test download access: the explicit
+dependency installation and image-pull steps do.
 
 ## Broker does not become healthy
+
+```bash
+docker info
+docker compose -f "$Single" ps -a
+docker compose -f "$Single" logs --tail 100 kafka
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker info
 docker compose -f $Single ps -a
 docker compose -f $Single logs --tail 100 kafka
 ```
+
+</details>
 
 Start Docker Engine/Desktop if the daemon is unavailable, and select Linux
 containers on Windows. Check free disk, Docker memory allocation, image-download
@@ -25,8 +95,24 @@ For the cluster, substitute `$Cluster` and inspect `broker-1`, `broker-2`, and
 Another application may own port 9092, 19092, 29092, or 39092. Identify it before
 stopping anything:
 
+On WSL/Ubuntu, inspect the selected port with `ss`:
+
+```bash
+ss -ltnp 'sport = :9092'
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
+
+On macOS:
+
+```bash
+lsof -nP -iTCP:9092 -sTCP:LISTEN
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+```
+
+On native Windows (or for a Windows-side listener affecting WSL):
+
 ```powershell
-Get-NetTCPConnection -LocalPort 9092 -ErrorAction SilentlyContinue
+Get-NetTCPConnection -LocalPort 9092 -State Listen
 docker ps --format "table {{.Names}}\t{{.Ports}}"
 ```
 
@@ -47,10 +133,20 @@ Compose loopback binding and avoiding failed IPv6 `localhost` attempts on Window
 
 ## Unknown topic or timeout while producing
 
+```bash
+"$Python" kafka/examples/topics.py
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --list
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\topics.py
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --list
 ```
+
+</details>
 
 Topic auto-creation is disabled deliberately. For the cluster, pass all three host
 bootstrap addresses and `--replication-factor 3` to `topics.py`.
@@ -115,14 +211,25 @@ Do not lower durability settings to make the lab "pass."
 
 Use the same virtual environment for installation and execution:
 
+```bash
+uv pip install --python ".venv/bin/python" --only-binary=:all: -r kafka/examples/requirements.txt
+".venv/bin/python" -m unittest discover -s kafka/examples -v
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -r kafka\examples\requirements.txt
+uv pip install --python .\.venv\Scripts\python.exe --only-binary=:all: -r kafka\examples\requirements.txt
 .\.venv\Scripts\python.exe -m unittest discover -s kafka\examples -v
 ```
 
+</details>
+
 If a wheel is unavailable for your Python/platform combination, use a supported
-64-bit CPython version with a published wheel, such as Python 3.13, or follow the
-client's official native-build instructions. Do not install random binary packages.
+native 64-bit CPython 3.13 environment as described in
+[setup](environment-setup.md). Binary-only installation intentionally refuses
+unsupported combinations. Do not install random binary packages.
 
 ## Workshop counts differ on a repeated run
 

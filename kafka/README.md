@@ -9,18 +9,27 @@ walkthrough, commands, expected observations, and assessment.
 
 ## Prerequisites
 
+- Complete the [cross-platform environment setup](environment-setup.md):
+  Windows 11 with Ubuntu on WSL 2, Docker-supported macOS (Intel/Apple Silicon),
+  or supported Ubuntu LTS (AMD64/ARM64).
 - Basic Python and command-line knowledge; no prior Kafka or enterprise-system experience.
 - Docker Engine or Docker Desktop running **Linux containers**, with Docker Compose
   v2.20 or newer. Follow your organization's Docker licensing and installation policy.
-- Python 3.11-3.14 and `venv`. Examples are exercised with Python 3.13.
+- Git, uv, and 64-bit CPython **3.13**, with a local virtual environment.
+  uv provisions the same Python minor version on every workshop platform.
 - Internet access to download the Apache Kafka image and Python dependency.
 - Approximately 4 GB available container memory for one broker, or 8 GB for the
-  three-broker lab; allow 10 GB free disk space. These are workshop budgets, not
+  three-broker lab; allow 10 GiB free disk space plus installation/image headroom.
+  These are workshop budgets, not
   production sizing recommendations.
 - Available loopback ports 9092, 19092, 29092, and 39092.
 
 No host Java installation, ZooKeeper, cloud account, or paid Kafka service is required.
-Commands use PowerShell on Windows; the guide gives POSIX-shell differences.
+The main lab commands use Bash on WSL, macOS, and Linux; directly runnable native
+Windows PowerShell alternatives are retained. Run the environment readiness check
+before starting containers, then the nine-event smoke test. See the
+[validation matrix](VALIDATION.md#cross-platform-acceptance) for observed versus
+pending host results; dependency availability is not full OS validation.
 
 ## Learning paths
 
@@ -41,8 +50,9 @@ compaction labs deliberately require observation rather than instant results.
 | Path | Purpose |
 | --- | --- |
 | [training-guide.md](training-guide.md) | Twelve sequenced modules and capstone |
+| [environment-setup.md](environment-setup.md) | OS-specific installation, shared Python environment, and readiness gate |
 | [infrastructure](infrastructure/) | Separate single-broker and three-broker Compose projects |
-| [examples](examples/) | Topic setup, producer, consumer, SQLite deduplication, smoke check |
+| [examples](examples/) | Environment preflight, topic setup, producer, consumer, SQLite deduplication, smoke check |
 | [labs/enterprise-extensions.md](labs/enterprise-extensions.md) | Connect, schemas, transactions, and stream-processing follow-ons |
 | [troubleshooting.md](troubleshooting.md) | Symptoms, causes, and recovery |
 | [VALIDATION.md](VALIDATION.md) | Reproduction commands and recorded validation scope |

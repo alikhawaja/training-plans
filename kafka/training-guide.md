@@ -447,45 +447,45 @@ revisit sections 1.3-1.7 before starting the tools.
 
 ### Prerequisites and command conventions
 
-Now prepare the environment. Read the [prerequisites and safety boundaries](README.md)
-first. Use a disposable working copy and synthetic data. Run **all commands from
-the repository root**. Open additional terminals at the same location when instructed.
-
-PowerShell setup:
-
-```powershell
-python --version
-docker version
-docker compose version
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r kafka\examples\requirements.txt
-$Python = ".\.venv\Scripts\python.exe"
-$Single = "kafka\infrastructure\compose.single.yml"
-$Cluster = "kafka\infrastructure\compose.cluster.yml"
-```
-
-Set the three variables in every new terminal; no virtual-environment activation or
-execution-policy change is needed. `& $Python` invokes the pinned environment.
-
-For **macOS/Linux**, prepare the equivalent environment:
+Complete [environment setup and the readiness gate](environment-setup.md) for your
+OS first. Windows learners use **Bash inside WSL 2**; macOS and Linux learners also
+use Bash. All follow the same commands and expected results below.
+Use a disposable working copy and synthetic data. Run **all commands from the
+repository root**. Set these variables in **every new terminal**, including
+consumer and Connect terminals:
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r kafka/examples/requirements.txt
 Python=".venv/bin/python"
 Single="kafka/infrastructure/compose.single.yml"
 Cluster="kafka/infrastructure/compose.cluster.yml"
 ```
 
-For the remaining commands, change `& $Python` to `"$Python"`, use `/` in local
-file paths, replace `Start-Sleep -Seconds N` with `sleep N`, and use the POSIX pipe
-example shown in module 3. Docker commands and their Kafka arguments otherwise
-remain the same. `/opt/kafka/...` is a path **inside the Linux container**, even
-when the host is Windows.
+For the optional **native Windows PowerShell** route, set these instead and use
+the expandable PowerShell alternatives throughout the guide:
+
+```powershell
+$Python = ".\.venv\Scripts\python.exe"
+$Single = "kafka\infrastructure\compose.single.yml"
+$Cluster = "kafka\infrastructure\compose.cluster.yml"
+```
+
+No virtual-environment activation or execution-policy change is needed.
+`/opt/kafka/...` always refers to the Linux container, not the host.
 
 ## 2. Run Kafka in a container (30 minutes)
 
 **Objective:** Start and inspect a single broker with persistent storage.
+
+```bash
+docker compose -f "$Single" config --quiet
+docker compose -f "$Single" up -d --wait --wait-timeout 180
+docker compose -f "$Single" ps
+docker compose -f "$Single" logs --tail 40 kafka
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --list
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker compose -f $Single config --quiet
@@ -494,6 +494,8 @@ docker compose -f $Single ps
 docker compose -f $Single logs --tail 40 kafka
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --list
 ```
+
+</details>
 
 **Expected:** The service becomes healthy and the list command succeeds; there may
 be no topics yet. Image download time is additional to broker initialization.
@@ -527,28 +529,50 @@ producing still fails?
 Create a separate scratch topic; this keeps plain-text messages out of the later
 JSON `orders` stream.
 
+```bash
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic scratch --partitions 3 --replication-factor 1
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --describe --topic scratch
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic scratch --partitions 3 --replication-factor 1
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --describe --topic scratch
 ```
 
-PowerShell: pipe two ASCII records to the console producer:
+</details>
 
-```powershell
-"order-1:first", "order-2:second" | docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka:19092 --topic scratch --property parse.key=true --property key.separator=:
-```
-
-POSIX equivalent:
+Pipe two ASCII records to the console producer:
 
 ```bash
 printf 'order-1:first\norder-2:second\n' | docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka:19092 --topic scratch --property parse.key=true --property key.separator=:
 ```
 
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
+```powershell
+"order-1:first", "order-2:second" | docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka:19092 --topic scratch --property parse.key=true --property key.separator=:
+```
+
+</details>
+
 Read the two records:
+
+```bash
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic scratch --from-beginning --max-messages 2 --timeout-ms 15000 --property print.key=true --property print.partition=true --property print.offset=true
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic scratch --from-beginning --max-messages 2 --timeout-ms 15000 --property print.key=true --property print.partition=true --property print.offset=true
 ```
+
+</details>
 
 **Expected:** Two values with keys, partition numbers, and offsets. The cross-partition
 display order is not guaranteed. The producer's lack of output alone is not delivery
@@ -564,11 +588,22 @@ at the end and waits for new records.
 
 **Objective:** Send structured events and perform a small persistent business effect.
 
+```bash
+"$Python" kafka/examples/topics.py
+"$Python" kafka/examples/producer.py --count 9
+"$Python" kafka/examples/consumer.py --group fulfillment --db .state/fulfillment.db --max-messages 9
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\topics.py
 & $Python kafka\examples\producer.py --count 9
 & $Python kafka\examples\consumer.py --group fulfillment --db .state\fulfillment.db --max-messages 9
 ```
+
+</details>
 
 Topic setup creates three partitions each for `orders`, `orders.dlt`, and
 `order-status`. It does not silently overwrite existing topic configuration.
@@ -599,9 +634,18 @@ number of records.
 
 Inspect the local business effect:
 
+```bash
+"$Python" -c "import sqlite3; c=sqlite3.connect('.state/fulfillment.db'); print(c.execute('SELECT order_id, event_count FROM order_totals ORDER BY order_id').fetchall())"
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python -c "import sqlite3; c=sqlite3.connect('.state/fulfillment.db'); print(c.execute('SELECT order_id, event_count FROM order_totals ORDER BY order_id').fetchall())"
 ```
+
+</details>
 
 **Verify:** Three orders have a count of three each. Read `producer.py`,
 `consumer.py`, and `common.py`. Locate the delivery callback, error handling,
@@ -620,11 +664,22 @@ every bottleneck. This sample favors visible per-record behavior over peak throu
 
 **Persistence experiment:**
 
+```bash
+docker compose -f "$Single" down
+docker compose -f "$Single" up -d --wait --wait-timeout 180
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --describe --topic orders
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single down
 docker compose -f $Single up -d --wait --wait-timeout 180
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --describe --topic orders
 ```
+
+</details>
 
 Topics remain because `down` without `--volumes` preserves named volumes.
 
@@ -635,12 +690,24 @@ broker has stored a record?
 
 **Objective:** Explain partition-local ordering and the limits of scaling.
 
+```bash
+"$Python" kafka/examples/producer.py --order-id order-42 --status created --count 1
+"$Python" kafka/examples/producer.py --order-id order-42 --status paid --count 1
+"$Python" kafka/examples/producer.py --order-id order-42 --status shipped --count 1
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic orders --from-beginning --max-messages 12 --timeout-ms 15000 --property print.key=true --property print.partition=true --property print.offset=true
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\producer.py --order-id order-42 --status created --count 1
 & $Python kafka\examples\producer.py --order-id order-42 --status paid --count 1
 & $Python kafka\examples\producer.py --order-id order-42 --status shipped --count 1
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic orders --from-beginning --max-messages 12 --timeout-ms 15000 --property print.key=true --property print.partition=true --property print.offset=true
 ```
+
+</details>
 
 **Expected:** All `order-42` events use the same partition and increasing offsets.
 The first nine records were from module 4. The three status commands execute
@@ -663,23 +730,52 @@ producers? What if a `paid` event arrives before `created`?
 
 Open two terminals. In both, run this command and leave it running:
 
+```bash
+"$Python" kafka/examples/consumer.py --group fulfillment --db .state/fulfillment.db --idle-timeout 600
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\consumer.py --group fulfillment --db .state\fulfillment.db --idle-timeout 600
 ```
 
+</details>
+
 In a third terminal, start analytics with a **separate group and database**:
+
+```bash
+"$Python" kafka/examples/consumer.py --group analytics --db .state/analytics.db --idle-timeout 600
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 & $Python kafka\examples\consumer.py --group analytics --db .state\analytics.db --idle-timeout 600
 ```
 
+</details>
+
 In a fourth terminal:
+
+```bash
+"$Python" kafka/examples/producer.py --count 30
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --describe --group fulfillment --members --verbose
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --describe --group analytics
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 & $Python kafka\examples\producer.py --count 30
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --describe --group fulfillment --members --verbose
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --describe --group analytics
 ```
+
+</details>
 
 **Expected:** Fulfillment partitions are split across group members; analytics
 independently sees the entire retained history, then new events. Assignment and
@@ -712,26 +808,56 @@ it does not rewind a group at each start.
 
 With all fulfillment consumers stopped:
 
+```bash
+"$Python" kafka/examples/producer.py --count 9
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --describe --group fulfillment
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\producer.py --count 9
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --describe --group fulfillment
 ```
 
+</details>
+
 **Expected:** Summed committed lag increases by nine if the group was caught up.
 Start fulfillment, watch it catch up, then stop it:
+
+```bash
+"$Python" kafka/examples/consumer.py --group fulfillment --db .state/fulfillment.db --max-messages 9
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 & $Python kafka\examples\consumer.py --group fulfillment --db .state\fulfillment.db --max-messages 9
 ```
 
+</details>
+
 **Warning: The following commands change the group's future read positions.**
 Use only this workshop group, with no active members. First preview:
+
+```bash
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --group fulfillment --topic orders --reset-offsets --to-earliest --dry-run
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --group fulfillment --topic orders --reset-offsets --to-earliest --execute
+"$Python" kafka/examples/consumer.py --group fulfillment --db .state/fulfillment.db --idle-timeout 600
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --group fulfillment --topic orders --reset-offsets --to-earliest --dry-run
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server kafka:19092 --group fulfillment --topic orders --reset-offsets --to-earliest --execute
 & $Python kafka\examples\consumer.py --group fulfillment --db .state\fulfillment.db --idle-timeout 600
 ```
+
+</details>
 
 **Verify:** Replayed events print `DUPLICATE`, not `APPLIED`, and the SQLite counts
 remain unchanged. Stop after the group catches up. For a fresh analytics rebuild,
@@ -752,18 +878,38 @@ usually resumes where it left off?
 
 Use a new one-partition topic with one event so the failure is unambiguous:
 
+```bash
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic reliability-orders --partitions 1 --replication-factor 1
+"$Python" kafka/examples/producer.py --topic reliability-orders --order-id reliability-1 --count 1
+"$Python" kafka/examples/consumer.py --topic reliability-orders --group replay-demo --db .state/replay-demo.db --max-messages 1 --crash-after-process
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:19092 --create --topic reliability-orders --partitions 1 --replication-factor 1
 & $Python kafka\examples\producer.py --topic reliability-orders --order-id reliability-1 --count 1
 & $Python kafka\examples\consumer.py --topic reliability-orders --group replay-demo --db .state\replay-demo.db --max-messages 1 --crash-after-process
 ```
 
+</details>
+
 The last command **must fail** after printing `APPLIED`. The injected exception
 leaves the business update durable but does not commit the Kafka offset.
+
+```bash
+"$Python" kafka/examples/consumer.py --topic reliability-orders --group replay-demo --db .state/replay-demo.db --max-messages 1
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 & $Python kafka\examples\consumer.py --topic reliability-orders --group replay-demo --db .state\replay-demo.db --max-messages 1
 ```
+
+</details>
 
 **Verify:** The same event is redelivered and prints `DUPLICATE`; its business
 effect occurs once in this SQLite store. This is application deduplication layered
@@ -773,10 +919,20 @@ on at-least-once consumption, not a distributed transaction with Kafka.
 
 Use a different group against the same single-event topic:
 
+```bash
+"$Python" kafka/examples/consumer.py --topic reliability-orders --group loss-demo --db .state/loss-demo.db --commit-before-process --crash-before-process --max-messages 1
+"$Python" kafka/examples/consumer.py --topic reliability-orders --group loss-demo --db .state/loss-demo.db --max-messages 1 --idle-timeout 10
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\consumer.py --topic reliability-orders --group loss-demo --db .state\loss-demo.db --commit-before-process --crash-before-process --max-messages 1
 & $Python kafka\examples\consumer.py --topic reliability-orders --group loss-demo --db .state\loss-demo.db --max-messages 1 --idle-timeout 10
 ```
+
+</details>
 
 **Expected:** The first command fails after committing, before processing.
 The second fails with an idle timeout because that record is already skipped for
@@ -788,11 +944,22 @@ advanced.
 
 Stop other fulfillment instances, then:
 
+```bash
+"$Python" kafka/examples/producer.py --invalid --count 1
+"$Python" kafka/examples/consumer.py --group fulfillment --db .state/fulfillment.db --max-messages 1
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic orders.dlt --from-beginning --max-messages 1 --timeout-ms 15000 --property print.key=true
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\producer.py --invalid --count 1
 & $Python kafka\examples\consumer.py --group fulfillment --db .state\fulfillment.db --max-messages 1
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic orders.dlt --from-beginning --max-messages 1 --timeout-ms 15000 --property print.key=true
 ```
+
+</details>
 
 Assuming fulfillment was caught up, it prints `DEAD-LETTER`. The envelope preserves
 the source topic, partition, offset, raw key/value/headers as Base64, and failure
@@ -827,6 +994,18 @@ our local database transaction not make Kafka and SQLite one atomic system?
 based on time or size. Retention is independent of consumer progress, and removal
 is asynchronous and segment-based.
 
+```bash
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:19092 --entity-type topics --entity-name orders --describe
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:19092 --entity-type topics --entity-name order-status --describe
+"$Python" kafka/examples/producer.py --topic order-status --order-id compact-1 --status created --count 1
+"$Python" kafka/examples/producer.py --topic order-status --order-id compact-1 --status paid --count 1
+"$Python" kafka/examples/producer.py --topic order-status --order-id compact-1 --status shipped --count 1
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic order-status --from-beginning --max-messages 3 --timeout-ms 15000 --property print.key=true --property print.offset=true
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:19092 --entity-type topics --entity-name orders --describe
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:19092 --entity-type topics --entity-name order-status --describe
@@ -836,6 +1015,8 @@ docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-configs.sh --bootst
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server kafka:19092 --topic order-status --from-beginning --max-messages 3 --timeout-ms 15000 --property print.key=true --property print.offset=true
 ```
 
+</details>
+
 **Expected:** Initially, all three versions may be visible. Compaction eventually
 retains the latest value per key within a partition, not one record immediately
 after every write. Offsets remain stable; removed records leave gaps.
@@ -843,11 +1024,22 @@ after every write. Offsets remain stable; removed records leave gaps.
 For a faster **local-only** observation, shorten segment rolling and make small
 dirty segments eligible:
 
+```bash
+docker compose -f "$Single" exec -T kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:19092 --entity-type topics --entity-name order-status --alter --add-config "segment.ms=10000,min.cleanable.dirty.ratio=0.01,max.compaction.lag.ms=30000"
+sleep 15
+"$Python" kafka/examples/producer.py --topic order-status --order-id compact-1 --status shipped --count 1
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single exec -T kafka /opt/kafka/bin/kafka-configs.sh --bootstrap-server kafka:19092 --entity-type topics --entity-name order-status --alter --add-config "segment.ms=10000,min.cleanable.dirty.ratio=0.01,max.compaction.lag.ms=30000"
 Start-Sleep -Seconds 15
 & $Python kafka\examples\producer.py --topic order-status --order-id compact-1 --status shipped --count 1
 ```
+
+</details>
 
 The additional append allows the old segment in that key's partition to roll.
 Wait a few minutes and inspect again using the console consumer with
@@ -857,9 +1049,18 @@ scheduling is asynchronous, so no exact elapsed-time assertion is appropriate.
 
 Publish a tombstone:
 
+```bash
+"$Python" kafka/examples/producer.py --topic order-status --order-id compact-1 --tombstone --count 1
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\producer.py --topic order-status --order-id compact-1 --tombstone --count 1
 ```
+
+</details>
 
 A tombstone is a **null value**, not the JSON text `"null"`. State-rebuilding
 consumers interpret it as deletion. Use the console consumer to inspect this topic:
@@ -882,13 +1083,30 @@ Stop single-broker clients. Stop the single-broker environment **without deletin
 volumes** to free resources. The following cluster is separate; it does not migrate
 the original topic data or consumer offsets.
 
+```bash
+docker compose -f "$Single" down
+"$Python" kafka/examples/check_environment.py --profile cluster
+docker compose -f "$Cluster" pull
+docker compose -f "$Cluster" up -d --wait --wait-timeout 180
+"$Python" kafka/examples/topics.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --replication-factor 3
+"$Python" kafka/examples/smoke_test.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --replication-factor 3
+docker compose -f "$Cluster" exec -T broker-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --describe --topic orders
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single down
+& $Python kafka\examples\check_environment.py --profile cluster
+docker compose -f $Cluster pull
 docker compose -f $Cluster up -d --wait --wait-timeout 180
 & $Python kafka\examples\topics.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --replication-factor 3
 & $Python kafka\examples\smoke_test.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --replication-factor 3
 docker compose -f $Cluster exec -T broker-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --describe --topic orders
 ```
+
+</details>
 
 **Expected:** Three replicas and three ISR members per partition once caught up.
 `Leader` identifies the broker serving each partition. All host addresses are
@@ -896,17 +1114,37 @@ advertised individually so clients can reconnect to surviving brokers.
 
 Start a cluster-specific consumer with a new database:
 
+```bash
+"$Python" kafka/examples/consumer.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --group cluster-fulfillment --db .state/cluster-fulfillment.db --idle-timeout 600
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 & $Python kafka\examples\consumer.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --group cluster-fulfillment --db .state\cluster-fulfillment.db --idle-timeout 600
 ```
 
+</details>
+
 From another terminal, stop broker 3, then produce:
+
+```bash
+docker compose -f "$Cluster" stop broker-3
+"$Python" kafka/examples/producer.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --count 9
+docker compose -f "$Cluster" exec -T broker-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --describe --topic orders
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker compose -f $Cluster stop broker-3
 & $Python kafka\examples\producer.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --count 9
 docker compose -f $Cluster exec -T broker-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --describe --topic orders
 ```
+
+</details>
 
 **Expected:** After election, writes succeed with two in-sync replicas. Temporary
 connection errors to the stopped broker are expected; they are not final delivery
@@ -920,10 +1158,20 @@ not "all three configured replicas must always be alive."
 
 Recover the node:
 
+```bash
+docker compose -f "$Cluster" start broker-3
+docker compose -f "$Cluster" exec -T broker-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --describe --topic orders
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Cluster start broker-3
 docker compose -f $Cluster exec -T broker-1 /opt/kafka/bin/kafka-topics.sh --bootstrap-server broker-1:9092 --describe --topic orders
 ```
+
+</details>
 
 Wait until ISR has three members again before continuing.
 
@@ -931,11 +1179,22 @@ Wait until ISR has three members again before continuing.
 three bootstrap addresses. It should fail rather than claim success after its
 30-second delivery timeout. Recover both nodes afterward:
 
+```bash
+docker compose -f "$Cluster" stop broker-2 broker-3
+"$Python" kafka/examples/producer.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --count 1
+docker compose -f "$Cluster" start broker-2 broker-3
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Cluster stop broker-2 broker-3
 & $Python kafka\examples\producer.py --bootstrap localhost:19092,localhost:29092,localhost:39092 --count 1
 docker compose -f $Cluster start broker-2 broker-3
 ```
+
+</details>
 
 Because these nodes also host controllers, losing two removes the metadata quorum
 **as well as** enough ISR members. This exercise cannot isolate which condition
@@ -965,10 +1224,20 @@ the cluster has three brokers?
 the small file-source/file-sink Connect lab using the running single broker. If
 you are currently on the cluster, stop its clients and run:
 
+```bash
+docker compose -f "$Cluster" down
+docker compose -f "$Single" up -d --wait --wait-timeout 180
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Cluster down
 docker compose -f $Single up -d --wait --wait-timeout 180
 ```
+
+</details>
 
 Then review the schema-evolution exercise there. Classify changes to our order
 contract: adding an optional field, deleting `order_id`, changing cents from integer
@@ -1053,18 +1322,38 @@ two-node outage rather than requiring every learner to wait for them.
 Stop any running Python consumers with Ctrl+C and stop Connect as described in
 the extension lab. Stop containers while **keeping** training data:
 
+```bash
+docker compose -f "$Single" down
+docker compose -f "$Cluster" down
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
+
 ```powershell
 docker compose -f $Single down
 docker compose -f $Cluster down
 ```
 
+</details>
+
 **Destructive, optional reset:** The following deletes only these Compose
 projects' Kafka volumes, including events, metadata, and group offsets:
+
+```bash
+docker compose -f "$Single" down --volumes
+docker compose -f "$Cluster" down --volumes
+```
+
+<details>
+<summary>PowerShell alternative (native Windows)</summary>
 
 ```powershell
 docker compose -f $Single down --volumes
 docker compose -f $Cluster down --volumes
 ```
+
+</details>
 
 SQLite files under `.state` are separate. Do not reuse a deduplication database
 when intending a completely fresh business-state rebuild; choose a new `--db`
