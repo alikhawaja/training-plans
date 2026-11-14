@@ -72,3 +72,15 @@ runs, and subagent activity. Provider choice and spending guidance will be
 specified with the implementation; optional search, tracing, or hosting services
 may add charges. A local-model path would require suitable hardware and verified
 tool-calling support.
+
+## Authoring and updating training
+
+Use the repository's [training-plan-builder skill](.github/skills/training-plan-builder/SKILL.md)
+to create or align modules. It includes a [module template](.github/skills/training-plan-builder/templates/module.md),
+a [training overview template](.github/skills/training-plan-builder/templates/training-overview.md),
+and a [review checklist](.github/skills/training-plan-builder/references/review-checklist.md).
+The shared format connects explanations, guided labs, independent exercises,
+failure checks, and evidence, with explicit prerequisites and module handoffs.
+
+[REST module 3](rest-apis/modules/03-create-and-read/README.md) is the initial pilot;
+the other modules have not yet been migrated.

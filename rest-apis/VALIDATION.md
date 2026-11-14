@@ -76,3 +76,51 @@ write. Smoke cleanup errors are surfaced, not silently ignored.
 The validation container, its generated data volume, and temporary offline build
 inputs were removed after the checks. The host virtual environment remains
 available and is excluded from version control.
+
+## Module 3 format pilot
+
+The standalone [module 3](modules/03-create-and-read/README.md) was exercised
+using Windows PowerShell, host Python 3.13.17, and HTTPX 0.28.1. The existing
+FastAPI application ran against a separate temporary SQLite database and
+loopback port 18063 to avoid changing learners' database or occupying their
+normal port 8000. CLI launches used `--base-url http://127.0.0.1:18063`;
+the published lesson keeps the normal port 8000.
+
+| Area | Observed result |
+| --- | --- |
+| Guided create/read/list | CLI create returned 201, quantity 2, pending status, and Location matching the returned ID; direct GET returned the same complete representation; list succeeded |
+| Repeated GET | Same business data and ETag, with no created order |
+| Reference exercise | Created and followed Location, rejected a duplicate with 409/Problem Details, and confirmed the original representation was unchanged |
+| Repeat runs | Default references differed; rerunning with an already used reference failed explicitly rather than reporting success |
+| Unauthorized run | Wrong token failed with 401 and a nonzero process exit; no resource was created |
+| Learner starter | Deliberately failed with NotImplementedError before making requests |
+| State and handoff | Separate guided order remained unchanged; exactly three orders were present in the isolated database after one guided create and two successful exercise runs |
+| Existing service/client tests | All nine passed unchanged |
+| Reference solution tests | Three passed: follows Location, stops on unexpected create status, and rejects changed final state |
+| Shared format checker | Module passed structural checks; four checker tests passed, including incomplete structure, placeholders, missing links, durations, and unclosed fences |
+
+Reproduce the non-live checks from the repository root:
+
+```powershell
+.\.venv\Scripts\python.exe .github\skills\training-plan-builder\scripts\check_module.py rest-apis\modules\03-create-and-read\README.md
+.\.venv\Scripts\python.exe -m unittest discover -s .github\skills\training-plan-builder\scripts -p test_check_module.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s rest-apis\solutions -p test_create_and_read.py -v
+.\.venv\Scripts\python.exe -m unittest discover -s rest-apis\examples -p test_api.py -v
+```
+
+For a live repeat, start the module 2 server and run the reference exercise:
+
+```powershell
+.\.venv\Scripts\python.exe rest-apis\solutions\03-create-and-read.py
+```
+
+That command leaves its order available for inspection, as the lesson explains;
+it does not delete shared data. The pilot verification server was stopped and
+its isolated database removed afterward.
+
+macOS/Linux launch commands are supplied but were not executed on those hosts.
+The module's Mermaid source was reviewed, not rendered in an automated browser.
+Swagger HTML and OpenAPI were served successfully; no interactive Swagger session
+or new Docker build was part of this pilot. The exercise starter remains a learner
+task, not a pre-completed implementation. Other modules are not claimed to conform
+to the new format yet.

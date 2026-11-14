@@ -418,40 +418,15 @@ both listeners on port 8000. Stop the foreground server with Ctrl+C.
 
 **Check:** Why is the `/docs` page a client even though the same server hosts it?
 
-## 3. Your first create and read requests (40 minutes)
+## 3. Your first create and read requests
 
-**Objective:** Observe a resource being created and then read it by its returned address.
+Continue in [module 3: Create an order and read it back](modules/03-create-and-read/README.md).
+This canonical module pilots the shared training format: conceptual introduction,
+guided lab, independent client exercise, failure checks, evidence, and handoff.
 
-```powershell
-& $Python rest-apis\examples\client.py create --reference first-order --item "Training notebook" --quantity 2
-& $Python rest-apis\examples\client.py list
-```
-
-**Expected:** Create returns `201`, a JSON order, `Location`, `ETag`, and
-`X-Request-ID`. The list returns `200` and contains the order.
-On a repeat run, use a new `--reference` or omit it to generate one automatically.
-Reusing an existing reference deliberately produces `409 Conflict`.
-
-The server generates `id`, `created_at`, `version`, and initial status `pending`.
-`Location` is the new resource's relative address; prepend the API base address
-to read it. Its stable `reference` is a synthetic business identifier.
-
-Copy the returned UUID:
-
-```powershell
-$OrderId = "REPLACE_WITH_THE_RETURNED_UUID"
-& $Python rest-apis\examples\client.py get $OrderId
-```
-
-The placeholder is not executable data; replace it before running. IDs and ETags
-in this guide are obtained from your server, never copied from another learner.
-
-**Verify:** The single-resource response and list entry have the same ID and fields.
-Observe that GET does not change quantity or create another order.
-The request IDs differ because these were different HTTP requests.
-
-**Check:** Why return a resource address instead of making clients guess the
-server's ID-generation rule?
+Complete its guided lab and retain the returned order ID as `$OrderId` in
+PowerShell or `OrderId` in Bash/zsh before continuing below. Each exercise run
+uses a separate business reference, so this module works with existing orders.
 
 ## 4. Build and understand a real client (45 minutes)
 
@@ -589,7 +564,7 @@ Deliberately fail quantity validation:
 
 In Swagger UI, try a create body with an unknown field, a string quantity instead
 of an integer, and a whitespace-only item. All should be rejected without adding
-orders. Try repeating the exact `first-order` reference to observe a 409.
+orders. Try repeating the actual reference from your module 3 order to observe a 409.
 
 Errors use a Problem Details shape and `application/problem+json`:
 

@@ -6,6 +6,11 @@ introduction to clients, servers, HTTP, and REST, then build and use an order AP
 **Start with the [training guide](training-guide.md).** It includes explanations,
 commands, expected responses, failure exercises, and a capstone.
 
+**Module-format pilot:** [Module 3: Create an order and read it back](modules/03-create-and-read/README.md)
+adds a separate guided lab, independent coding exercise, failure checks, evidence
+criteria, and a reference solution. Start with the guide's foundations and setup
+before that module; the remaining modules retain their existing format.
+
 ## Prerequisites
 
 - Basic Python and terminal familiarity; no web or enterprise-system background.
@@ -35,6 +40,9 @@ Allow time for discussion and troubleshooting, not only command execution.
 | Path | Purpose |
 | --- | --- |
 | [training-guide.md](training-guide.md) | Foundations, twelve modules, and capstone |
+| [modules/03-create-and-read](modules/03-create-and-read/README.md) | Canonical module 3 lesson and guided/independent activities |
+| [exercises/03-create-and-read.py](exercises/03-create-and-read.py) | Learner starter for the module 3 client |
+| [solutions/03-create-and-read.py](solutions/03-create-and-read.py) | Completed example to review after attempting the exercise |
 | [examples/api.py](examples/api.py) | FastAPI orders service with SQLite persistence |
 | [examples/client.py](examples/client.py) | HTTPX command-line client with explicit timeouts and bounded safe retries |
 | [examples/test_api.py](examples/test_api.py) | Focused service and client tests |
