@@ -40,12 +40,12 @@ queries information. A **service** provides a capability to other programs, such
 as finding orders or accepting a new one.
 
 ```mermaid
-flowchart LR
+flowchart TB
     U["You click View order"] --> C["Shopping application"]
-    C -->|"Asks for order-42"| S["Order service"]
+    C -->|"Asks for<br/>order-42"| S["Order service"]
     S --> D[("Order database")]
     D --> S
-    S -->|"Returns order information"| C
+    S -->|"Returns<br/>order information"| C
     C --> V["Screen displays the order"]
 ```
 
@@ -71,10 +71,10 @@ and edit its shelves yourself. The analogy explains the boundary, but real APIs
 also need precise data formats, authentication, failure handling, and versioning.
 
 ```mermaid
-flowchart LR
+flowchart TB
     W["Website"] --> A["Order API<br/>Agreed public interface"]
-    M["Mobile application"] --> A
-    I["Approved integration"] --> A
+    M["Mobile<br/>application"] --> A
+    I["Approved<br/>integration"] --> A
     A --> L["Order logic"]
     L --> D[("Database<br/>Not directly exposed")]
 ```
@@ -92,16 +92,17 @@ The program asking is the **client**. The program listening and answering is the
 kinds of machines. A service can be a server for one call and a client for another.
 
 ```mermaid
+%%{init: {"sequence": {"wrap": true, "width": 110, "actorMargin": 25}}}%%
 sequenceDiagram
     actor U as Learner
     participant C as Client program
     participant S as API server
     participant D as Database
     U->>C: Ask for an order
-    C->>S: Request: get order-42
-    S->>D: Look up the order
-    D-->>S: Stored order data
-    S-->>C: Response: success and order data
+    C->>S: Request<br/>Get order-42
+    S->>D: Look up<br/>the order
+    D-->>S: Stored<br/>order data
+    S-->>C: Success response<br/>Order data
     C-->>U: Show the result
 ```
 
@@ -180,11 +181,18 @@ A **representation** is data describing that resource, such as a JSON order.
 The representation is not the resource's internal database row or table schema.
 
 ```mermaid
-flowchart LR
-    C["Client"] -->|"GET /api/v1/orders/42"| A["API interface"]
-    A -->|"JSON representation of order 42"| C
-    A --> L["Business rules"]
-    L --> D[("Internal storage")]
+%%{init: {"sequence": {"wrap": true, "width": 110, "actorMargin": 25}}}%%
+sequenceDiagram
+    participant C as Client
+    participant A as API interface
+    participant L as Business rules
+    participant D as Internal storage
+    C->>A: GET<br/>/api/v1/orders/42
+    A->>L: Read order 42
+    L->>D: Look up order
+    D-->>L: Stored order data
+    L-->>A: Order<br/>representation
+    A-->>C: JSON representation<br/>of order 42
 ```
 
 The short ID `42` is just conceptual here; our runnable service uses UUIDs.
@@ -232,7 +240,7 @@ a quantity by one the same kind of PATCH as setting it to three?
 We will build a small but recognizable service:
 
 ```mermaid
-flowchart LR
+flowchart TB
     C["Client<br/>Browser or Python"] --> U["HTTP server<br/>Uvicorn"]
     U --> R["Routes and validation<br/>FastAPI and Pydantic"]
     R --> B["Order operations<br/>Authentication and rules"]
@@ -296,13 +304,11 @@ Our clients will create, read, update, and delete synthetic orders. The server
 will enforce a contract, save data, and return explainable HTTP responses:
 
 ```mermaid
-flowchart LR
-    B["Browser Swagger UI"] --> A
-    P["Python command-line client"] --> A
-    T["Automated tests"] -. "In-process test requests" .-> A
-    subgraph D["Local API container"]
-        A["Order API<br/>HTTP on port 8000"] --> S[("SQLite in a data volume")]
-    end
+flowchart TB
+    B["Browser<br/>Swagger UI"] --> A
+    P["Python<br/>command-line client"] --> A
+    T["Automated<br/>tests"] -. "In-process<br/>test requests" .-> A
+    A["Local API container<br/>Order API on port 8000"] --> S[("SQLite in a data volume")]
 ```
 
 The Python client and browser use the real network listener. In-process tests
@@ -797,10 +803,10 @@ what that caller is allowed to do. Our single shared token demonstrates credenti
 transport only: every accepted caller has the same access.
 
 ```mermaid
-flowchart LR
+flowchart TB
     C["Client request"] --> H["HTTPS protects traffic<br/>Required in a real deployment"]
     H --> I["Authentication<br/>Who is calling?"]
-    I --> P["Authorization<br/>May this caller access this order?"]
+    I --> P["Authorization<br/>May this caller<br/>access this order?"]
     P --> B["Business operation"]
 ```
 
@@ -985,18 +991,19 @@ to another. Caching policy is a deliberate API/security choice.
 Now model two people editing the same version:
 
 ```mermaid
+%%{init: {"sequence": {"wrap": true, "width": 110, "actorMargin": 25}}}%%
 sequenceDiagram
     participant A as Editor A
     participant S as Order API
     participant B as Editor B
     A->>S: GET order
-    S-->>A: Representation and ETag version 1
+    S-->>A: Representation<br/>ETag version 1
     B->>S: GET same order
-    S-->>B: Representation and ETag version 1
-    A->>S: PATCH with If-Match version 1
-    S-->>A: 200 and ETag version 2
-    B->>S: PATCH with old If-Match version 1
-    S-->>B: 412 Precondition Failed
+    S-->>B: Representation<br/>ETag version 1
+    A->>S: PATCH<br/>If-Match: version 1
+    S-->>A: 200 OK<br/>ETag version 2
+    B->>S: PATCH<br/>If-Match: old version 1
+    S-->>B: 412<br/>Precondition Failed
 ```
 
 Use the same saved version twice in the same Python interpreter. Choose a first
@@ -1132,6 +1139,7 @@ It does not erase your workshop orders. See [validation scope](VALIDATION.md)
 for what was exercised and the container-build environment limitation.
 
 ```mermaid
+%%{init: {"sequence": {"wrap": true, "width": 110, "actorMargin": 25}}}%%
 sequenceDiagram
     participant C as Client
     participant S as Order API
@@ -1140,7 +1148,7 @@ sequenceDiagram
     S->>D: Save the order
     D-->>S: Saved
     S--xC: Response lost
-    Note over C: Timeout: outcome is unknown
+    Note over C: Timeout<br/>Outcome<br/>unknown
 ```
 
 Our unique business reference can help reconcile a duplicate submission, but it
@@ -1161,12 +1169,12 @@ automatically repeated. Confirm that previously created orders survive the resta
 A larger architecture might look like this:
 
 ```mermaid
-flowchart LR
-    C["Web, mobile, service clients"] --> G["TLS endpoint / API gateway"]
-    G --> A["Order service instances"]
-    A --> D[("Shared durable database")]
+flowchart TB
+    C["Web, mobile,<br/>service clients"] --> G["TLS endpoint<br/>API gateway"]
+    G --> A["Order service<br/>instances"]
+    A --> D[("Shared durable<br/>database")]
     A --> O["Logs, metrics, traces"]
-    G --> I["Identity and policy integration"]
+    G --> I["Identity and policy<br/>integration"]
 ```
 
 This is a conceptual target, not what the Compose file deploys. A **gateway**

@@ -77,20 +77,21 @@ cases including old requests against new servers and new responses against old c
 workshops' terminology. Kafka is optional and is not called by this API.
 
 ```mermaid
+%%{init: {"sequence": {"wrap": true, "width": 90, "actorMargin": 10}}}%%
 sequenceDiagram
     participant C as API client
     participant A as Order API
     participant D as Database
-    participant R as Outbox relay
+    participant R as Outbox<br/>relay
     participant K as Kafka
     C->>A: POST order
-    A->>D: One transaction: order and outbox event
+    A->>D: One transaction<br/>Save order +<br/>outbox event
     D-->>A: Commit
-    A-->>C: 201 Created and Location
-    R->>D: Read pending outbox work
-    R->>K: Publish order-created event
+    A-->>C: 201 Created<br/>Location
+    R->>D: Read pending<br/>outbox work
+    R->>K: Publish event<br/>Order created
     K-->>R: Acknowledge
-    R->>D: Record delivery progress
+    R->>D: Record<br/>delivery progress
 ```
 
 Explain why the 201 confirms order creation, not fulfillment completion. If a
