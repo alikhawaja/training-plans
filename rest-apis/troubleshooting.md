@@ -132,6 +132,24 @@ The docs HTML can load while its CDN-hosted JavaScript or stylesheet is blocked.
 Use approved network settings, inspect `/openapi.json`, or use the Python client.
 A successful docs page is not proof that protected endpoints accept your credentials.
 
+## Postman cannot connect or variables are unresolved
+
+Keep the workshop server running and use the desktop app for localhost requests.
+A cloud agent cannot reach your computer's loopback listener. With the web app,
+use an approved Desktop Agent rather than exposing the API publicly.
+
+Save requests inside the REST workshop collection. Confirm `base_url` has no
+trailing slash, and that Create order's post-response script populated `order_id`
+and `etag` after a 201. An active environment can override collection variables;
+inspect the resolved values. Use inherited Bearer auth and do not duplicate the
+Authorization header. For PATCH/DELETE, preserve the ETag's quotes but do not
+wrap `{{etag}}` in additional quotes. The lab's second PATCH deliberately uses
+a stale ETag and should return 412.
+
+Postman menu names can vary by version. Response assertions belong in
+**Scripts > Post-response** (or **Tests** in older versions), not Pre-request.
+Do not share real tokens or sensitive response data in synced workspaces or exports.
+
 ## 401 Unauthorized
 
 Select Authorize in Swagger UI and enter only `workshop-demo-token`; the UI adds

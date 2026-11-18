@@ -40,6 +40,21 @@ configuration were checked. These checks do **not** establish native macOS/Linux
 or zsh execution, Windows PowerShell 5.1 execution, installer success on each OS,
 or a successful standard online Docker build.
 
+### Swagger and Postman lesson revision
+
+The Postman lesson's HTTP workflow was reproduced using FastAPI's in-process
+test client and an isolated temporary database: list/create/read/PATCH, stale
+PATCH (412), DELETE (204 with no body), read-after-delete (404), and unauthenticated
+list (401). Its three JavaScript snippets were executed in Node with a minimal
+Postman API harness and those real response fixtures; all four assertions passed,
+and order-ID/ETag variable capture was checked.
+
+This validates the documented contract and script logic, not the Postman UI or
+its complete sandbox. Postman installation, workspace setup, dynamic GUID
+substitution, variable resolution, and interactive desktop execution were not
+automated. Installation and post-response script guidance was checked against
+the linked official Postman documentation.
+
 ### Container build limitation
 
 The standard online Docker build failed in this environment while negotiating

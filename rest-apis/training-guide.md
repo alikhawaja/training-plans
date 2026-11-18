@@ -257,9 +257,28 @@ API. **Pydantic** validates the shape and types of submitted data. **SQLite**
 stores records in a file. You do not need to memorize these names before the lab.
 
 An **API contract** specifies accepted input, responses, errors, and behavior.
-**OpenAPI** is a machine-readable format for describing much of that contract.
-**Swagger UI** is an interactive page that reads the description and makes
-requests; it is a client, not the database or the service implementation.
+These related names describe different things:
+
+| Name | What it means | In this workshop |
+| --- | --- | --- |
+| OpenAPI | A specification for a machine-readable description of an HTTP API: paths, methods, inputs, responses, and security requirements | FastAPI generates `/openapi.json` from our application |
+| Swagger | A family of tools for designing, documenting, and working with APIs described using OpenAPI | We use one tool from this family: Swagger UI |
+| Swagger UI | A browser-based tool that turns an OpenAPI description into interactive documentation and can send real HTTP requests | FastAPI serves it at `/docs` |
+
+Think of OpenAPI as a machine-readable menu and Swagger UI as a page that displays
+the menu and lets you place an order. Swagger UI is **a client**, not the API,
+database, or server implementation. It does not create business behavior merely
+by documenting it. OpenAPI was originally based on the Swagger Specification;
+today the specification is called OpenAPI, while Swagger names the tooling.
+
+Selecting **Try it out** and **Execute** sends a real request to the running
+service. POST/PATCH/DELETE can change its stored data; this is not a simulation.
+Our server provides this page, so learners do not install Swagger UI separately.
+It still needs access to its externally hosted browser assets.
+
+**Postman** is another API client. Unlike the generated Swagger UI page, it lets
+you organize your own requests into saved collections and add repeatable response
+checks. Both call the same API; neither replaces the service or its Python tests.
 
 In the workshop, routing, validation, and order functions share one small file
 so learners can follow a request. Separate boxes represent responsibilities,
@@ -514,6 +533,135 @@ execute the authorized list request. If one fails, use
 [troubleshooting](troubleshooting.md) instead of continuing with a partial setup.
 
 **Check:** Why is the `/docs` page a client even though the same server hosts it?
+
+### Guided API testing with Postman
+
+**Objective:** Send the same HTTP requests from another client, save them, and
+check their responses. Complete this short lesson after Swagger UI; later
+modules explain CRUD, validation, and concurrency in more detail.
+
+#### Install and connect
+
+Download the [Postman desktop app](https://www.postman.com/downloads/) for your OS.
+On Windows run the installer; on macOS choose Intel/Apple silicon as appropriate
+and move the app to Applications; on Linux follow the
+[official installation instructions](https://learning.postman.com/docs/getting-started/installation/install-app/)
+for Snap or the matching downloaded archive. No shell-specific HTTP commands are
+needed for this lesson. Open the app and complete any approved workspace/sign-in
+setup before class.
+
+Use the **desktop app** for the local API. A cloud agent cannot reach the
+`127.0.0.1` listener on your computer. If using the web app instead, configure its
+Desktop Agent according to Postman's documentation; do not expose the workshop
+server publicly as a workaround. Keep the existing Docker or native server
+running; Postman does not start it.
+
+#### Save a collection and variables
+
+Create a collection named **REST workshop**. A collection is a saved group of
+requests, not a database of orders. In its **Variables** tab, add `base_url` with
+the value `http://127.0.0.1:8000` (no trailing slash). Leave `order_id` and `etag`
+unset until you receive them from the server. Use local values where available;
+check workspace sharing/sync settings before saving or exporting anything.
+
+In the collection's **Authorization** settings choose **Bearer Token** and enter
+`workshop-demo-token`, without the word `Bearer`. Save each request below in this
+collection with **Inherit auth from parent**. Do not also add a manual Authorization
+header. These values are deliberately public and synthetic; never put real
+credentials in shared collections, exports, or screenshots.
+
+Create a **GET** request named **List orders** with this URL:
+`{{base_url}}/api/v1/orders?limit=2`. Double braces substitute a variable's value.
+Select **Send**, then inspect the status (`200`), JSON body, response headers,
+and response time. Distinguish the request's Headers tab from the response's
+Headers tab. Save the request.
+
+In this request's **Scripts > Post-response** tab (called **Tests** in some older
+versions), add these JavaScript assertions, save, and send again:
+
+```javascript
+pm.test("List returns 200", function () {
+    pm.response.to.have.status(200);
+});
+pm.test("Collection contains at most two orders", function () {
+    const body = pm.response.json();
+    pm.expect(body.items).to.be.an("array");
+    pm.expect(body.items.length).to.be.at.most(2);
+    pm.expect(body.limit).to.eql(2);
+});
+```
+
+Inspect **Test Results**. A request returning a response is not enough: failed
+assertions must be investigated. Response time here is one observation, not a
+load test or service-level guarantee.
+
+#### Create, update, and delete one synthetic order
+
+Create a **POST** request named **Create order** to
+`{{base_url}}/api/v1/orders`. Under **Body**, select **raw** and **JSON**; confirm
+`Content-Type: application/json`. Use:
+
+```json
+{"reference":"postman-{{$guid}}","item":"Postman notebook","quantity":2}
+```
+
+`{{$guid}}` is Postman's dynamic GUID variable, so each send uses a fresh business
+reference. Before sending, save this post-response script on **Create order**:
+
+```javascript
+pm.test("Order is created with an ETag", function () {
+    pm.response.to.have.status(201);
+    pm.expect(pm.response.headers.get("ETag")).to.be.a("string").and.not.empty;
+    pm.expect(pm.response.json().id).to.be.a("string").and.not.empty;
+});
+if (pm.response.code === 201) {
+    pm.collectionVariables.set("order_id", pm.response.json().id);
+    pm.collectionVariables.set("etag", pm.response.headers.get("ETag"));
+}
+```
+
+Send once and expect `201` and a passing test. Inspect `Location`, `ETag`, and
+`X-Request-ID` in the response headers. The script captures the order ID and ETag
+as collection variables for later requests. Every additional send creates another
+real order; avoid clicking Send repeatedly.
+
+Keep the captured ETag's quotes; do not
+add extra quotes around `{{etag}}` in Postman's header value. If you have an active
+environment, ensure it does not override these collection variables.
+
+Save and send these requests **one at a time**, inspecting each result:
+
+| Request name | Method and URL | Body or headers | Expected |
+| --- | --- | --- | --- |
+| Read order | `GET {{base_url}}/api/v1/orders/{{order_id}}` | Inherited Bearer auth | 200; same ID as Create |
+| Update quantity | `PATCH {{base_url}}/api/v1/orders/{{order_id}}` | Header `If-Match: {{etag}}`; raw JSON body `{"quantity":3}` | 200; quantity is 3; response has a new ETag |
+| Stale update | Send Update quantity again without changing `etag` | The old `If-Match` is deliberately reused | 412; no overwrite |
+| Delete order | `DELETE {{base_url}}/api/v1/orders/{{order_id}}` | First copy the new ETag from the successful PATCH response into the collection's `etag` variable; header `If-Match: {{etag}}`; no body | 204; empty response body |
+| Read deleted order | Send Read order again | Same ID | 404 |
+
+Do not attach an automatic ETag-refresh script to PATCH in this exercise: we
+intentionally retain the old version to demonstrate 412. Do not parse a 204
+response as JSON. Delete any extra orders you created by reading each order's
+current ETag and deleting only that selected resource.
+
+For **Read deleted order**, add a post-response check with the expected failure:
+
+```javascript
+pm.test("Deleted order returns 404", function () {
+    pm.response.to.have.status(404);
+});
+```
+
+A 404 can be a **passing test** when it is the intended outcome. For another
+negative check, duplicate List orders, override its authorization with **No Auth**,
+send, and expect 401. Remove or change its inherited copied 200 assertion so the
+test checks the intended behavior. Restore inherited auth for normal requests.
+
+**Verify:** Your saved collection contains create/read/update/delete requests,
+the list assertions pass, the stale write returns 412, and the deleted order
+returns 404. Explain how Swagger UI, Postman, and Python send requests to the same
+server. Keep Python's automated service/client tests for deeper behavior checks;
+this manually ordered lesson is not yet a repeatable Collection Runner suite.
 
 ## 3. Your first create and read requests (40 minutes)
 
@@ -1323,5 +1471,8 @@ state or use a broad Docker volume prune to reset one workshop.
 - [Problem Details: RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html)
 - [REST architectural constraints](https://ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm)
 - [OpenAPI specification](https://spec.openapis.org/oas/latest.html)
+- [Swagger UI](https://swagger.io/tools/swagger-ui/)
+- [Postman installation](https://learning.postman.com/docs/getting-started/installation/install-app/)
+- [Postman post-response tests](https://learning.postman.com/docs/tests-and-scripts/write-scripts/test-scripts/)
 - [FastAPI tutorial](https://fastapi.tiangolo.com/tutorial/)
 - [HTTPX quick start](https://www.python-httpx.org/quickstart/)

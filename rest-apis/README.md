@@ -17,6 +17,7 @@ The conceptual introduction needs no software installation.
 | Python 3.11-3.13, with pip and venv | All hands-on learners, including those using a container server | Windows: `python --version`; macOS/Linux: `python3 --version` |
 | A terminal and shell | All hands-on learners | Windows PowerShell 5.1 or PowerShell 7+; macOS Terminal with zsh/bash; Linux terminal with bash |
 | A browser | All hands-on learners | Can open local addresses and Swagger UI |
+| Postman desktop app | The guided API-testing lesson after Swagger UI | Install the Windows, macOS, or Linux app from [Postman downloads](https://www.postman.com/downloads/), then confirm it opens |
 | Git | Only when obtaining the repository with `git clone` | `git --version`; downloading and extracting the repository ZIP is an alternative |
 | curl | The command-line comparison exercises in modules 4 and 7 | Windows: `curl.exe --version`; macOS/Linux: `curl --version` |
 | Docker running Linux containers and Compose v2.20+ | Only the Docker server path | `docker info` and `docker compose version` |
@@ -33,6 +34,9 @@ requirements if selected, and approximately 1 GB available container memory.
 Port 8000 on loopback must be available. Internet access is needed for packages,
 container images if selected, and Swagger UI's externally hosted assets.
 No cloud account is required.
+Postman's workspace/sign-in requirements depend on the app version and your
+organization's policy; arrange approved access before the Postman lesson. Use
+only the synthetic lab data and public demo token, never production credentials.
 
 ### Install missing tools
 
