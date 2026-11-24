@@ -78,6 +78,7 @@ Allow time for discussion and troubleshooting, not only command execution.
 | [training-guide.md](training-guide.md) | Foundations, twelve modules, and capstone |
 | [examples/api.py](examples/api.py) | FastAPI orders service with SQLite persistence |
 | [examples/client.py](examples/client.py) | HTTPX command-line client with explicit timeouts and bounded safe retries |
+| [examples/client_v2.py](examples/client_v2.py) | Beginner Requests library example: direct Session calls for CRUD and conditional reads, with cleanup |
 | [examples/test_api.py](examples/test_api.py) | Focused service and client tests |
 | [examples/smoke_test.py](examples/smoke_test.py) | Live HTTP checks using temporary orders that it removes afterward |
 | [infrastructure/compose.yml](infrastructure/compose.yml) | Local container and persistent data volume |

@@ -55,6 +55,20 @@ substitution, variable resolution, and interactive desktop execution were not
 automated. Installation and post-response script guidance was checked against
 the linked official Postman documentation.
 
+### Requests client v2
+
+`examples/client_v2.py` adds direct Requests Session calls without replacing
+the HTTPX CLI. All eleven service/client tests passed on Windows with Python
+3.13 after installing the updated requirements. The Requests workflow was
+exercised through a Requests transport adapter connected to the real FastAPI
+application and a temporary SQLite database: create/list/read, conditional 304,
+PATCH/PUT, and deletion. It removed its own order while preserving an existing
+order. A simulated lost create response was propagated without retry or an
+attempt to delete an unidentified resource.
+
+The v2 `--help` entry point was also checked. This revision does not claim a new
+live-network, Docker build, or native macOS/Linux execution check.
+
 ### Container build limitation
 
 The standard online Docker build failed in this environment while negotiating

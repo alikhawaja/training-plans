@@ -798,6 +798,61 @@ They use the same contract even though the clients are different programs.
 
 **Check:** Why should a client set a timeout instead of waiting indefinitely?
 
+### Client v2: use the Requests library directly
+
+The existing `client.py` remains the HTTPX command-line client used throughout
+this guide. [client_v2.py](examples/client_v2.py) is a separate, readable Python
+example using the **Requests** package directly, not the original `ApiClient`
+wrapper. Read its `session.get`, `post`, `patch`, `put`, and `delete` calls.
+Both libraries invoke the same HTTP API; Requests does not require another server.
+
+With the API running, install the updated requirements and run the demo from
+the repository root:
+
+**Windows - PowerShell:**
+
+```powershell
+& $Python -m pip install -r rest-apis\examples\requirements.txt
+& $Python rest-apis\examples\client_v2.py
+```
+
+**macOS/Linux - bash or zsh:**
+
+```bash
+"$Python" -m pip install -r rest-apis/examples/requirements.txt
+"$Python" rest-apis/examples/client_v2.py
+```
+
+The script creates a uniquely referenced synthetic order, lists a page, reads
+its order, gets a bodyless 304, performs PATCH and PUT using server-provided ETags,
+and deletes only its own order. Expect 201, 200, 200, 304, 200, 200, 200, and 204,
+followed by a PASS message. Each response displays its method, URL, status,
+selected headers, and JSON body when present. Modules 5 and 9 explain the update
+and ETag behavior in more depth.
+
+`requests.Session()` reuses connections and sets the demo Bearer header once.
+`json=` serializes bodies, `params=` encodes query parameters, and
+`timeout=(2, 5)` sets connect/read timeouts, not an overall workflow deadline.
+Requests has no default timeout, so the sample supplies one on every call.
+Redirect following is disabled so unexpected redirects are surfaced rather than
+silently treated as successful API operations. Error statuses and unexpected
+responses terminate the script with a nonzero exit.
+
+Unlike the original HTTPX client, this small teaching example has **no automatic
+retries**, including for reads. Do not retry POST blindly after a lost response:
+the server may already have created the order. The `finally` block attempts
+cleanup after creation has returned an ID; cleanup failures are surfaced. A lost
+create response, malformed success response, or failed cleanup can leave an order
+for manual reconciliation. Do not reset unrelated workshop data.
+
+Use `--base-url` to select a different local listener. The script accepts `--token`
+or `TRAINING_API_TOKEN`, defaulting to the explicitly public workshop demo token.
+Keep real credentials out of command history. This example uses a venv-installed
+Requests package; no additional Postman or Swagger installation is needed.
+
+**Verify:** Locate the calls that set the token, submit JSON, preserve ETag quotes,
+and close the session. Explain why 204/304 bodies are not decoded as JSON.
+
 ## 5. Design resources and implement CRUD (50 minutes)
 
 **Objective:** Connect HTTP operations to service code without exposing storage internals.

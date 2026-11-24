@@ -5,10 +5,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import httpx
+import requests
 from fastapi.testclient import TestClient
 
 from api import create_app
 from client import ApiClient
+from client_v2 import run_demo
 
 TOKEN = {"Authorization": "Bearer workshop-demo-token"}
 ORDERS = "/api/v1/orders"
@@ -164,6 +166,63 @@ class ClientTests(unittest.TestCase):
                 self.assertEqual(client.request("GET", ORDERS).status_code, status)
                 sleep.assert_not_called()
             self.assertEqual(len(calls), 1)
+
+
+class RequestsClientTests(unittest.TestCase):
+    def test_demo_uses_real_http_contract_and_removes_its_order(self):
+        from requests.adapters import BaseAdapter
+
+        with tempfile.TemporaryDirectory() as directory:
+            with TestClient(create_app(
+                Path(directory) / "orders.db", token="workshop-demo-token"
+            )) as service:
+                existing = service.post(
+                    ORDERS, headers=TOKEN,
+                    json={"reference": "existing-order", "item": "Keep me", "quantity": 1},
+                )
+                self.assertEqual(existing.status_code, 201)
+                calls = []
+
+                class ServiceAdapter(BaseAdapter):
+                    def send(self, request, **kwargs):
+                        calls.append((request, kwargs))
+                        result = service.request(
+                            request.method, request.url, headers=dict(request.headers),
+                            content=request.body, follow_redirects=False,
+                        )
+                        response = requests.Response()
+                        response.status_code = result.status_code
+                        response.headers.update(result.headers)
+                        response._content = result.content
+                        response.url = request.url
+                        response.request = request
+                        return response
+
+                    def close(self):
+                        pass
+
+                session = requests.Session()
+                session.mount("http://", ServiceAdapter())
+                with patch("client_v2.requests.Session", return_value=session):
+                    with patch("builtins.print"):
+                        run_demo()
+                self.assertEqual(
+                    [response[0].method for response in calls],
+                    ["POST", "GET", "GET", "GET", "PATCH", "PUT", "GET", "DELETE"],
+                )
+                self.assertTrue(all(options["timeout"] == (2, 5) for _, options in calls))
+                remaining = service.get(ORDERS, headers=TOKEN).json()
+                self.assertEqual(remaining["total"], 1)
+                self.assertEqual(remaining["items"][0]["id"], existing.json()["id"])
+
+    def test_lost_create_response_is_not_retried(self):
+        with patch("client_v2.requests.Session") as factory:
+            session = factory.return_value.__enter__.return_value
+            session.post.side_effect = requests.ReadTimeout("response lost")
+            with self.assertRaises(requests.ReadTimeout):
+                run_demo()
+            session.post.assert_called_once()
+            session.delete.assert_not_called()
 
 
 if __name__ == "__main__":
